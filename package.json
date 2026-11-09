@@ -1,15 +1,17 @@
 {
   "name": "motoride-montage",
   "version": "1.0.0",
-  "description": "My Remotion video",
-  "repository": {},
-  "license": "UNLICENSED",
+  "description": "Viral-style moto Shorts engine (Remotion calm path)",
+  "repository": {"type": "git", "url": "https://github.com/m-elkhou/motoride-montage.git"},
+  "license": "MIT",
   "engines": {
     "node": "^18.18.0 || ^20.9.0 || >=21.1.0"
   },
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.541",
+    "@remotion/media-utils": "^4.0.541",
+    "@remotion/transitions": "^4.0.541",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "remotion": "4.0.541"

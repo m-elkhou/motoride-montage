@@ -1,7 +1,105 @@
-node_modules
-dist
-.DS_Store
+# ───────────────────────── Secrets & identifiants ─────────────────────────
+# JAMAIS versionner : clés, jetons OAuth, certificats, fichiers d'environnement.
 .env
+.env.*
+!.env.example
+secrets/
+**/secrets/
+client_secret*.json
+token*.json
+*.token
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+auth.log
+auth.err
+local_paths.json
 
-# Ignore the output video from Git but not videos you import into src/.
-out
+# ───────────────────────── Données & état d'exécution ─────────────────────
+# Tout ce que le pipeline génère ou apprend : propre à CHAQUE chaîne, jamais au code.
+data/
+out/
+props/
+vo/
+meta/
+!meta.example/
+specs/
+manifest.json
+INDEX.md
+_sheet/
+_cls/
+scan/mont/
+scan/sheet/
+scan/_cls/
+scan/*.json
+scan/*.jsonl
+!scan/*.example.json
+*.sqlite
+*.sqlite3
+*.db
+*.cache
+.cache/
+cache/
+
+# ───────────────────────── Médias (lourds, droits d'auteur, personnels) ───
+# Musiques = licences propres à chacun (Pixabay, Audio Library…), ne pas redistribuer.
+public/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.m4a
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.heic
+*.psd
+
+# ───────────────────────── Logs, sauvegardes, temporaires ─────────────────
+*.log
+*.err
+*.bak
+*.bak[0-9]
+*.orig
+*.rej
+*.tmp
+*.swp
+~$*
+Thumbs.db
+.DS_Store
+
+# ───────────────────────── Python ─────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# ───────────────────────── Node / Remotion ────────────────────────────────
+node_modules/
+dist/
+build/
+.remotion/
+remotion.cache/
+
+# ───────────────────────── Site de documentation généré ───────────────────
+site/
+
+# ───────────────────────── Outils & sessions locales ──────────────────────
+.vscode/
+.idea/
+.claude/
+.playwright-cli/
+.playwright-mcp/
