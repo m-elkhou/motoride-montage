@@ -1,5 +1,8 @@
 """upload_short.py : fonctions pures (aucun reseau, aucun jeton)."""
 import json
+import sys
+
+import pytest
 
 import upload_short as u
 
@@ -72,5 +75,12 @@ def test_ledger_reads_legacy_files_and_survives_corruption(tmp_path):
     assert u.load_ledger(ledger, tmp_path)[u.norm(tmp_path / "new.json")] == "NEW"
 
 
-def test_norm_ignores_case_and_separators():
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Windows : casse et antislash ignores")
+def test_norm_ignores_case_and_separators_on_windows():
     assert u.norm("C:\\Dir\\File.json") == u.norm("c:/dir/file.json")
+
+
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX : systeme de fichiers sensible a la casse")
+def test_norm_keeps_case_on_posix():
+    assert u.norm("/tmp/Dir/File.json") != u.norm("/tmp/dir/file.json")
+    assert u.norm("/tmp/a/../b.json") == u.norm("/tmp/b.json")
