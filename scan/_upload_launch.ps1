@@ -1,2 +1,21 @@
-Set-Location 'C:\workdir\uw\scraper\social2shorts'
-& uv run python -X utf8 C:/workdir/uw/scraper/motoride-montage/upload_short.py C:/workdir/uw/scraper/motoride-montage/meta/g_crew_22.json C:/workdir/uw/scraper/motoride-montage/meta/g_crew_23.json C:/workdir/uw/scraper/motoride-montage/meta/g_crew_24.json C:/workdir/uw/scraper/motoride-montage/meta/g_crew_25.json C:/workdir/uw/scraper/motoride-montage/meta/g_crew_26.json C:/workdir/uw/scraper/motoride-montage/meta/g_crew_27.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_00.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_01.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_02.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_03.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_04.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_06.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_08.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_09.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_10.json C:/workdir/uw/scraper/motoride-montage/meta/g_pov_11.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_12.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_13.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_14.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_15.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_16.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_17.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_18.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_19.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_20.json C:/workdir/uw/scraper/motoride-montage/meta/g_rider_21.json  --retry-min 45 --max-hours 30 *> C:/workdir/uw/scraper/motoride-montage/meta/upload.log 2>&1
+# Lance l'envoi YouTube des Shorts de meta/ (motif -Pattern) via upload_short.py.
+# A lancer DETACHE pour survivre a la fermeture du terminal :
+#   Start-Process powershell -ArgumentList '-NoProfile','-File','scan\_upload_launch.ps1' -WindowStyle Hidden
+# Le journal des envois (meta/_uploaded.json) permet de relancer sans rien renvoyer deux fois.
+param(
+    [int]$RetryMin = 45,
+    [int]$MaxHours = 30,
+    [string]$Pattern = 'g_*.json'
+)
+$Root = Split-Path -Parent $PSScriptRoot
+$S2S = if ($env:MM_S2S_ROOT) { $env:MM_S2S_ROOT } else { Join-Path (Split-Path -Parent $Root) 'social2shorts' }
+$Log = Join-Path $Root 'meta\upload.log'
+
+$metas = Get-ChildItem (Join-Path $Root 'meta') -Filter $Pattern |
+    Where-Object { $_.Name -notlike '_*' } | Sort-Object Name |
+    ForEach-Object { $_.FullName -replace '\\', '/' }
+if (-not $metas) { "Aucun meta ne correspond a '$Pattern'" | Tee-Object -FilePath $Log; exit 1 }
+
+# uv run depuis le projet social2shorts : il fournit OAuth et le client YouTube.
+Set-Location $S2S
+& uv run python -X utf8 (Join-Path $Root 'upload_short.py') @metas --retry-min $RetryMin --max-hours $MaxHours *> $Log

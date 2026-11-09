@@ -1,10 +1,15 @@
 """Scanne chaque clip: mouvement (scene score), nettete (laplacien), pics audio, luminosite -> meilleures fenetres.
 Resumable: une ligne JSON par clip dans scan/moments.jsonl."""
-import json, subprocess, re, sys, os, tempfile, time
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[1]))
+import json, subprocess, re, os, tempfile, time
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
-FF="C:/ffmpeg/bin/ffmpeg"
+import mm_paths
+mm_paths.use_root()
+FF=mm_paths.FFMPEG
 HW=["-hwaccel","cuda"] if os.environ.get("SCAN_HW")=="1" else []
 OUT=Path("scan/moments.jsonl")
 
@@ -12,11 +17,13 @@ def scan(rec):
     p=rec["path"]; t0=time.time(); d=Path(tempfile.mkdtemp(prefix="mo_"))
     try:
         # frames gris 2fps 160px + scene score 10fps via une seule passe? deux passes legeres
-        r=subprocess.run([FF,*HW,"-i",p,"-vf","scale=160:-2,fps=10,select='gte(scene,0)',metadata=print:file=-","-an","-f","null","NUL"],capture_output=True,text=True,errors="replace",timeout=600)
+        r=subprocess.run([FF,*HW,"-i",p,"-vf","scale=160:-2,fps=10,select='gte(scene,0)',metadata=print:file=-","-an","-f","null",os.devnull],capture_output=True,text=True,errors="replace",timeout=600)
+        if r.returncode!=0: raise RuntimeError("ffmpeg scene: "+(r.stderr or "")[-100:].replace(chr(10)," "))
         ts,sc=[],[]
         for m in re.finditer(r"pts_time:([\d.]+)[\s\S]*?lavfi\.scene_score=([\d.]+)",r.stdout): ts.append(float(m.group(1))); sc.append(float(m.group(2)))
         ts=np.array(ts); sc=np.array(sc)
-        subprocess.run([FF,*HW,"-i",p,"-vf","scale=160:-2,fps=2,format=gray","-an",str(d/"%05d.png")],capture_output=True,timeout=600)
+        r2=subprocess.run([FF,*HW,"-i",p,"-vf","scale=160:-2,fps=2,format=gray","-an",str(d/"%05d.png")],capture_output=True,text=True,errors="replace",timeout=600)
+        if r2.returncode!=0: raise RuntimeError("ffmpeg frames: "+(r2.stderr or "")[-100:].replace(chr(10)," "))
         from PIL import Image
         sh,br=[],[]
         for f in sorted(d.glob("*.png")):
@@ -53,9 +60,9 @@ def scan(rec):
     finally:
         for f in d.glob("*"): 
             try: f.unlink()
-            except: pass
+            except OSError: pass
         try: d.rmdir()
-        except: pass
+        except OSError: pass
 
 if __name__=="__main__":
     inv=json.load(open("scan/inventory.json",encoding="utf-8"))
@@ -64,7 +71,7 @@ if __name__=="__main__":
     if OUT.exists():
         for l in open(OUT,encoding="utf-8"):
             try: done.add(json.loads(l)["path"])
-            except: pass
+            except (ValueError, KeyError): pass
     todo=[x for x in todo if x["path"] not in done]
     limit=int(sys.argv[1]) if len(sys.argv)>1 else len(todo)
     todo=todo[:limit]

@@ -1,9 +1,12 @@
-import json, subprocess, os, sys, time
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[1]))
+import json, subprocess, time
 from pathlib import Path
-FP="C:/ffmpeg/bin/ffprobe"
-ROOTS={"inbox":Path("C:/workdir/uw/scraper/social2shorts/inbox"),
-       "camera_roll":Path("C:/workdir/uw/scraper/social2shorts/camera_roll"),
-       "insta360":Path.home()/"Desktop"/"insta360"}
+import mm_paths
+mm_paths.use_root()
+FP=mm_paths.FFPROBE
+ROOTS=dict(mm_paths.CLIP_DIRS)
 EXT={".mp4",".mov",".insv",".mkv",".webm",".m4v",".3gp",".insp",".lrv"}
 inv=[]; t0=time.time()
 for src,root in ROOTS.items():
@@ -18,7 +21,7 @@ for src,root in ROOTS.items():
         except Exception as e: rec["err"]=type(e).__name__
         inv.append(rec)
 json.dump(inv,open("scan/inventory.json","w",encoding="utf-8"),ensure_ascii=False)
-from collections import Counter, defaultdict
+from collections import Counter
 print(f"fichiers: {len(inv)}  ({time.time()-t0:.0f}s)")
 for src in ROOTS:
     L=[x for x in inv if x["src"]==src]

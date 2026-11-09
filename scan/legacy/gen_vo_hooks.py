@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 """Genere une voix COURTE par montage = la ligne du hook (voix clonee, recette smoke).
-Sortie vo/<id>.wav . Rapide et leger: 1 phrase, minimal."""
+Sortie vo/<id>.wav . Rapide et leger: 1 phrase, minimal.
+EXPERIMENTAL (Chatterbox, voix clonee) : le pipeline utilise scan/gen_vo_edge.py (.mp3), pas ce script (.wav)."""
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[2]))
+import mm_paths
+mm_paths.use_root()
 import json, time
-from pathlib import Path
 import numpy as np, soundfile as sf, librosa, torch
-M=Path("C:/workdir/uw/scraper/motoride-montage"); VO=M/"vo"; VO.mkdir(exist_ok=True)
-REF=Path("C:/workdir/uw/scraper/social2shorts/work/voiceover/ref_en_clean.wav")
+M=mm_paths.ROOT; VO=M/"vo"; VO.mkdir(exist_ok=True)
+REF=mm_paths.VOICE_REF
 def post(wav,sr):
     wav=np.ascontiguousarray(np.asarray(wav,dtype=np.float32))
     t,_=librosa.effects.trim(wav,top_db=80)

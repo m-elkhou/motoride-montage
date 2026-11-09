@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 """Re-rendu des 8 montages avec musique PHONK libre de droits (Pixabay, sans attribution).
 Rend dans out/_ph/ ; on bascule vers out/ apres verification."""
-import subprocess, sys, os, json
-PY = "C:/workdir/_s2s_cb/venv/Scripts/python.exe"
+NOTE = "ponctuel : re-rendu des 8 premiers montages ; garde pour reference (ranger dans scan/legacy/)"
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[2]))
+import mm_paths
+mm_paths.use_root()
+import subprocess, os
+PY = mm_paths.RENDER_PYTHON
 # (nom_final, fichier_segments, musique_phonk, hook_a_l_ecran, duree_s)
 JOBS = [
  ("m_mountain",   "scan/mont/mountain.json", "ph_aura.mp3",    "THE ROAD THAT CLEARS YOUR HEAD", 18),

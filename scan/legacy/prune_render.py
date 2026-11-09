@@ -1,8 +1,14 @@
-import json, subprocess, sys
+"""OBSOLETE (remplace par rerender_phonk.py, lui-meme ponctuel) : premier rendu des 6 montages initiaux."""
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[2]))
+import mm_paths
+mm_paths.use_root()
+import json, subprocess
 KEEP={"alpes":[0,2,3,4,6,7,9,11],"crew":[0,1,2,3,4,5,6,7,8,10,11],"golden":[0,1,2,5,7,8,10,11],"winter":list(range(12)),"ferry":[0,1,2,6,7,10],"meet":[0,1,2,4,5,3,10,11]}
 RENDER={"alpes":("adrift.mp3","SWISS ALPS ON A KTM",20),"crew":("snow_drift.mp3","POV: YOU FOUND YOUR CREW",18),"golden":("shady.mp3","CHASING THE LAST LIGHT",18),
         "winter":("kick_it.mp3","WINTER CAN'T STOP THE CREW",18),"ferry":("piano_trap_beethoven.mp3","ESCAPE THE CITY",18),"meet":("sacrifices.mp3","COUNT THE BIKES",16)}
-PY="C:/workdir/_s2s_cb/venv/Scripts/python.exe"; FF="C:/ffmpeg/bin/ffmpeg"
+PY=mm_paths.RENDER_PYTHON; FF=mm_paths.FFMPEG
 allclips=set()
 for k,idx in KEEP.items():
     segs=json.load(open(f"scan/mont/{k}.json",encoding="utf-8")); keep=[segs[i] for i in idx if i<len(segs)]

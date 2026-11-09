@@ -1,11 +1,18 @@
 """Assemble des listes de moments par theme -> segments json + planche de controle (1 image par segment)."""
-import json, re, subprocess, sys
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[1]))
+import json, re, subprocess, os
 from pathlib import Path
-FF="C:/ffmpeg/bin/ffmpeg"
+import mm_paths, mm_config
+mm_paths.use_root()
+FF=mm_paths.FFMPEG
+FONT=mm_paths.ffmpeg_font()
+HW=["-hwaccel","cuda"] if os.environ.get("SCAN_HW")=="1" else []
 R=[json.loads(l) for l in open("scan/moments.jsonl",encoding="utf-8")]; R=[r for r in R if r.get("ok")]
 for r in R:
     m=re.search(r"(20\d{6})",r["name"]); r["date"]=m.group(1) if m else "?"
-EXCL={"20230822","20240124","20260801","20240819","20231210","20250504_23"}  # perso / hors moto
+EXCL=set(mm_config.load()["exclude_dates"])  # meme source que gen_batch.py (scan/gen_config.json)
 TAGS=json.load(open("scan/clip_tags.json",encoding="utf-8"))
 SPECS=json.load(open("scan/montage_specs.json",encoding="utf-8"))
 Path("scan/mont").mkdir(exist_ok=True)
@@ -26,7 +33,7 @@ for sp in SPECS:
     d=Path(f"scan/mont/{sp['id']}_f"); d.mkdir(exist_ok=True)
     for f in d.glob("*.jpg"): f.unlink()
     for i,s in enumerate(keep):
-        subprocess.run([FF,"-y","-hwaccel","cuda","-ss",str(s["start"]+1.5),"-i",s["clip"],"-frames:v","1","-vf",f"scale=150:-2,pad=150:267:(ow-iw)/2:(oh-ih)/2:black,drawtext=fontfile='C\\:/Windows/Fonts/arialbd.ttf':text='{i}':x=3:y=3:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6",str(d/f"{i:02d}.jpg")],capture_output=True)
+        subprocess.run([FF,"-y",*HW,"-ss",str(s["start"]+1.5),"-i",s["clip"],"-frames:v","1","-vf",f"scale=150:-2,pad=150:267:(ow-iw)/2:(oh-ih)/2:black,drawtext=fontfile='{FONT}':text='{i}':x=3:y=3:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6",str(d/f"{i:02d}.jpg")],capture_output=True,timeout=120)
     n=len(list(d.glob("*.jpg")))
-    if n: subprocess.run([FF,"-y","-i",str(d/"%02d.jpg"),"-vf",f"tile={min(n,12)}x1:nb_frames={n}","-frames:v","1",f"scan/mont/{sp['id']}_sheet.jpg"],capture_output=True)
+    if n: subprocess.run([FF,"-y","-i",str(d/"%02d.jpg"),"-vf",f"tile={min(n,12)}x1:nb_frames={n}","-frames:v","1",f"scan/mont/{sp['id']}_sheet.jpg"],capture_output=True,timeout=120)
     print(f"{sp['id']:10s} pool={len(pool):3d} clips | segments={len(keep):2d} | {sp['hook']}")

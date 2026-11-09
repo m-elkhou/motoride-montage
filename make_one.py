@@ -3,14 +3,15 @@ Usage: python make_one.py spec.json
 Etapes: pre-encode clip 1080x1920 -> props -> remotion render -> loudnorm -> nettoyage.
 Idempotent, continue-on-error (code de sortie != 0 si echec, mais log ecrit)."""
 import json, subprocess, sys, shutil, time
-from pathlib import Path
 
-MONTAGE = Path("C:/workdir/uw/scraper/motoride-montage")
+import mm_paths
+
+MONTAGE = mm_paths.ROOT
 PUBLIC = MONTAGE / "public"
 OUT = MONTAGE / "out"
 PROPS = MONTAGE / "props"
-INBOX = Path("C:/workdir/uw/scraper/social2shorts/inbox")
-FF = "C:/ffmpeg/bin/ffmpeg"
+INBOX = mm_paths.CLIP_DIRS["inbox"]
+FF = mm_paths.FFMPEG
 for d in (OUT, PROPS):
     d.mkdir(parents=True, exist_ok=True)
 

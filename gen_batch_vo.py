@@ -2,11 +2,12 @@
 Recette smoke (exag0.5/cfg0.3/temp0.7, phrases entieres, traitement minimal).
 Ecrit vo/<id>.wav + vo/<id>.timings.json + specs/<id>.json (pour make_one.py)."""
 import json, time
-from pathlib import Path
 import numpy as np, soundfile as sf, librosa, torch
 
-MONTAGE = Path("C:/workdir/uw/scraper/motoride-montage")
-REF = Path("C:/workdir/uw/scraper/social2shorts/work/voiceover/ref_en_clean.wav")
+import mm_paths
+
+MONTAGE = mm_paths.ROOT
+REF = mm_paths.VOICE_REF
 VO = MONTAGE / "vo"; SPECS = MONTAGE / "specs"
 VO.mkdir(exist_ok=True); SPECS.mkdir(exist_ok=True)
 GAP = 0.45

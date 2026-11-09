@@ -1,14 +1,19 @@
 """pHash des clips candidats vs sources deja publiees (sha) + 3 detectes pHash -> exclut les doublons de chaine.
 Usage: uv run (dans social2shorts) python <ce fichier> cand.json  -> cand_checked.json"""
-import json, sys
-from pathlib import Path
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[1]))
+import json
+import mm_paths
 from social2shorts.phash import phash_file, min_distance
-ROOT=Path("C:/workdir/uw/scraper/social2shorts")
+ROOT=mm_paths.S2S_ROOT
 pub=list((ROOT/"_duplicates/on_channel_sha").glob("*.mp4"))+list((ROOT/"_duplicates/on_channel_phash").glob("*.mp4"))
-cache=Path("C:/workdir/uw/scraper/motoride-montage/scan/published_hashes.json")
+cache=mm_paths.SCAN/"published_hashes.json"
+def key(f): s=f.stat(); return f"{f.name}|{s.st_size}|{s.st_mtime_ns}"   # nom+taille+date : un fichier remplace est recalcule
 H=json.load(open(cache)) if cache.exists() else {}
+H={k:v for k,v in H.items() if "|" in k}   # ancien format (nom seul) : a recalculer
 for f in pub:
-    if f.name not in H: H[f.name]=phash_file(f,8)
+    if key(f) not in H: H[key(f)]=phash_file(f,8)
 json.dump(H,open(cache,"w"),indent=0)
 cand=json.load(open(sys.argv[1],encoding="utf-8")); out=[]
 for c in cand:

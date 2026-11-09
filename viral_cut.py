@@ -1,13 +1,15 @@
 """Montage 'style viral' : coupes sur le beat, passages a forte energie visuelle, slow-mo sur le drop,
 grade, hook texte, musique forte, SANS voix. Sortie 1080x1920 30fps.
 Usage: python viral_cut.py --clips a.mp4 b.mp4 --music public/future.mp3 --hook "PARIS AT 3 A.M." --target 18 --out out/x.mp4"""
-import argparse, json, subprocess, re, tempfile, os
+import argparse, json, shutil, subprocess, re, tempfile, os
 from pathlib import Path
-import numpy as np, librosa
-FF="C:/ffmpeg/bin/ffmpeg"; FONT="C\:/Windows/Fonts/arialbd.ttf"; FPS=30
+import numpy as np
+import mm_paths
+FF=mm_paths.FFMPEG; FONT=mm_paths.ffmpeg_font(); FPS=30
 def run(cmd): return subprocess.run(cmd,capture_output=True,text=True,encoding="utf-8",errors="replace")
 
 def music_grid(path, target):
+    import librosa  # import differe : inutile pour tester le reste sans librosa
     y,sr=librosa.load(path,sr=22050,mono=True,duration=90)
     tempo,beats=librosa.beat.beat_track(y=y,sr=sr,units="time")
     tempo=float(np.atleast_1d(tempo)[0]); beats=list(beats)
@@ -22,7 +24,7 @@ def music_grid(path, target):
     return tempo,offset,drop-offset,grid
 
 def clip_energy(path):
-    r=run([FF,"-i",path,"-vf","scale=160:-2,fps=10,select='gte(scene,0)',metadata=print:file=-","-an","-f","null","NUL"])
+    r=run([FF,"-i",path,"-vf","scale=160:-2,fps=10,select='gte(scene,0)',metadata=print:file=-","-an","-f","null",os.devnull])
     ts,sc=[],[]
     for m in re.finditer(r"pts_time:([\d.]+)[\s\S]*?lavfi\.scene_score=([\d.]+)",r.stdout):
         ts.append(float(m.group(1))); sc.append(float(m.group(2)))
@@ -56,7 +58,7 @@ def main():
     ap.add_argument("--grade",default="eq=contrast=1.08:saturation=1.25:brightness=0.01,vignette=PI/5")
     a=ap.parse_args()
     tempo,offset,drop,grid=music_grid(a.music,a.target)
-    spb=60/tempo; mult=2 if tempo>140 else 1
+    mult=2 if tempo>140 else 1
     print(f"musique: {tempo:.0f} BPM, offset {offset:.2f}s, drop a {drop:.2f}s, {len(grid)} beats dans {a.target}s")
     if a.segments:
         M=json.load(open(a.segments,encoding="utf-8")); a.clips=list(dict.fromkeys(m["clip"] for m in M))
@@ -109,7 +111,7 @@ def main():
             lines=[" ".join(w[:best])," ".join(w[best:])]
         fs=int(min(92, 1500/max(len(l) for l in lines)))
         tf=Path(tempfile.mkdtemp(prefix="hk_"))/"hook.txt"; tf.write_text(chr(10).join(lines),encoding="utf-8")
-        tfp=tf.as_posix().replace(":","\:")
+        tfp=tf.as_posix().replace(":","\\:")
         txt=f",drawtext=fontfile='{FONT}':textfile='{tfp}':x=(w-text_w)/2:y=150:fontsize={fs}:line_spacing=10:fontcolor=white:borderw=6:bordercolor=black:box=1:boxcolor=black@0.35:boxborderw=22:enable='between(t,0.15,3.2)'" 
     outro=a.outro.strip()
     if outro:
@@ -119,11 +121,21 @@ def main():
             ol=[" ".join(w2[:b])," ".join(w2[b:])]
         ofs=int(min(80,1400/max(len(l) for l in ol)))
         otf=Path(tempfile.mkdtemp(prefix="ou_"))/"outro.txt"; otf.write_text(chr(10).join(ol),encoding="utf-8")
-        otfp=otf.as_posix().replace(":","\:")
+        otfp=otf.as_posix().replace(":","\\:")
         t0=max(0.0,a.target-3.0); t1=a.target-0.25
         txt=txt+f",drawtext=fontfile='{FONT}':textfile='{otfp}':x=(w-text_w)/2:y=h*0.60:fontsize={ofs}:line_spacing=10:fontcolor=white:borderw=6:bordercolor=black:box=1:boxcolor=black@0.35:boxborderw=22:enable='between(t,{t0:.2f},{t1:.2f})'"
-    fc=(f"[0:v]{a.grade}{txt},format=yuv420p[v];"
-        f"[1:a]atrim=start={offset:.3f},asetpts=PTS-STARTPTS,atrim=0:{a.target},afade=t=in:d=0.3,afade=t=out:st={a.target-0.8:.2f}:d=0.8,loudnorm=I=-14:TP=-1:LRA=9[a]")
-    r=run([FF,"-y","-i",str(cat),"-i",a.music,"-filter_complex",fc,"-map","[v]","-map","[a]","-t",str(a.target),"-c:v","libx264","-preset","fast","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",a.out])
+    vfc=f"[0:v]{a.grade}{txt},format=yuv420p[v]"
+    afc=(f"[1:a]atrim=start={offset:.3f},asetpts=PTS-STARTPTS,atrim=0:{a.target},afade=t=in:d=0.3,afade=t=out:st={a.target-0.8:.2f}:d=0.8,loudnorm=I=-14:TP=-1:LRA=9[a]")
+    # Encodage final en DEUX etapes : (1) video seule, (2) audio + copie de la video.
+    # Un seul graphe video+audio se figeait de facon deterministe avec ffmpeg 9.x (ex. a l'image 414, sortie coincee) ;
+    # la video seule s'encode en ~10 s, l'assemblage en ~1 s. Meme rendu, plus de blocage.
+    vonly=tmp/"video_only.mp4"
+    r=run([FF,"-y","-i",str(cat),"-filter_complex",vfc,"-map","[v]","-t",str(a.target),"-c:v","libx264","-preset","fast","-crf","20",str(vonly)])
+    if vonly.exists():
+        r=run([FF,"-y","-i",str(vonly),"-i",a.music,"-filter_complex",afc,"-map","0:v","-map","[a]","-t",str(a.target),"-c:v","copy","-c:a","aac","-b:a","192k","-movflags","+faststart",a.out])
     print("OK ->",a.out if Path(a.out).exists() else "ECHEC "+r.stderr[-400:])
-main()
+    for d in {tmp, *(Path(x).parent for x in (tf if hook else None, otf if outro else None) if x)}:  # dossiers temporaires
+        shutil.rmtree(d,ignore_errors=True)
+
+if __name__=="__main__":
+    main()

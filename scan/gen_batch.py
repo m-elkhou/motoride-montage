@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 """Genere N montages 'texte motivant' varies par theme, clips uniques (zero recoupement).
 Ecrit: scan/mont/g_<id>.json (segments) + scan/batch_manifest.json (hook/outro/musique/titre/publishAt)."""
-import json, os, re
+import sys
+from pathlib import Path as _P
+sys.path.insert(0,str(_P(__file__).resolve().parents[1]))
+import json, os
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
+import mm_paths, mm_config
+mm_paths.use_root()
+CFG=mm_config.load()   # scan/gen_config.json (dates exclues, calendrier, textes) : voir mm_config.py
 
 R=[json.loads(l) for l in open("scan/moments.jsonl",encoding="utf-8")]
 R=[r for r in R if r.get("ok")]
@@ -13,12 +19,12 @@ def moto(path): return TAGS.get(path,{}).get("moto",0)
 
 # clips deja utilises (9 montages existants) -> ne jamais reutiliser
 used=set()
-for k in ["mountain","paris","night","crew_p","winter_p","meet_p","alpes_p","golden_p","escape_p"]:
+for k in CFG["used_montages"]:
     p=f"scan/mont/{k}.json"
     if os.path.exists(p):
         for s in json.load(open(p,encoding="utf-8")): used.add(os.path.basename(s["clip"]))
 
-EXCL_DATE={"20230822","20240124","20260801","20240819","20231210"}  # perso
+EXCL_DATE=set(CFG["exclude_dates"])  # footage perso : scan/gen_config.json
 MOTO_CATS={"moto_pov","rider","group_ride","bike_meet"}
 
 # segments candidats par categorie-theme
@@ -65,17 +71,23 @@ TAGSET={
  "crew":["moto","motovlog","crew","groupride","bikelife","motorcycle","ride","balade","motards","brotherhood"],
 }
 
+# surcharges optionnelles des textes/listes depuis scan/gen_config.json
+for _n,_d in (("hooks",HOOKS),("outros",OUTROS),("titles",TITLES),("tagset",TAGSET)): _d.update(CFG.get(_n,{}))
+MUSIC=CFG.get("music",MUSIC)
+if "themes" in CFG: THEMES={k:(v[0],v[1]) for k,v in CFG["themes"].items()}
+
 manifest=[]
 gi=0
-# publishAt: 2/jour a partir du 12/11 17Z (apres la file actuelle qui finit escape 12/11 10Z)
-start=datetime(2026,11,12,17,0,0,tzinfo=timezone.utc)
+# publishAt : 2 creneaux/jour (premier creneau puis le lendemain le second), depuis schedule_start
+H0,H1=CFG["slot_hours"]
+if CFG["schedule_start"]: start=datetime.fromisoformat(CFG["schedule_start"].replace("Z","+00:00"))
+else: start=(datetime.now(timezone.utc)+timedelta(days=1)).replace(hour=H0,minute=0,second=0,microsecond=0)
 slots=[]
 d=start
 for _ in range(60):
     slots.append(d)
-    # alterner 17Z puis +1j 10Z
-    if d.hour==17: d=(d+timedelta(days=1)).replace(hour=10)
-    else: d=d.replace(hour=17)
+    if d.hour==H0: d=(d+timedelta(days=1)).replace(hour=H1)
+    else: d=d.replace(hour=H0)
 
 for theme,(cats_w,n) in THEMES.items():
     pool=collect(cats_w)

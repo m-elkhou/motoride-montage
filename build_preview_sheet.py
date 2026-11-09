@@ -1,10 +1,11 @@
 import subprocess, math, json
-from pathlib import Path
 
-MON = Path("C:/workdir/uw/scraper/motoride-montage")
+import mm_paths
+
+MON = mm_paths.ROOT
 OUT = MON / "out"; TMP = MON / "_sheet"; TMP.mkdir(exist_ok=True)
-FF = "C:/ffmpeg/bin/ffmpeg"
-FONT = "C\\:/Windows/Fonts/arialbd.ttf"
+FF = mm_paths.FFMPEG
+FONT = mm_paths.ffmpeg_font()
 
 manifest = {m["id"]: m for m in json.load(open(MON / "manifest.json", encoding="utf-8"))}
 ids = [f"{s}{i:02d}" for s in "abc" for i in range(1, 11)]
@@ -34,7 +35,7 @@ print("preview:", n, "vignettes | manquants:", missing)
 # INDEX.md
 STYLE = {"day": "A — Daylight Freedom", "night": "B — Night Rider", "raw": "C — Escape / Adventure"}
 lines = ["# Les 30 Shorts — index\n",
-         f"Dossier des vidéos : `C:\\workdir\\uw\\scraper\\motoride-montage\\out\\`  — aperçu : `PREVIEW_30.jpg`\n"]
+         f"Dossier des vidéos : `{OUT}`  — aperçu : `PREVIEW_30.jpg`\n"]
 for st in ("day", "night", "raw"):
     lines.append(f"\n## {STYLE[st]}\n")
     for vid in ids:
