@@ -26,8 +26,8 @@ vo/
 meta/
 !meta.example/
 specs/
-manifest.json
-INDEX.md
+/manifest.json
+/INDEX.md
 _sheet/
 _cls/
 scan/mont/
