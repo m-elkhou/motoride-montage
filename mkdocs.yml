@@ -1,0 +1,86 @@
+site_name: motoride-montage
+site_description: Viral-style moto Shorts engine - beat-synced montages, claim-free music, light voice hooks, paced YouTube uploads.
+site_url: https://m-elkhou.github.io/motoride-montage/
+repo_url: https://github.com/m-elkhou/motoride-montage
+repo_name: m-elkhou/motoride-montage
+edit_uri: edit/main/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  language: en
+  icon:
+    logo: material/video-vintage
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.instant
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - content.code.copy
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - def_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Pipeline:
+      - pipeline/index.md
+      - 1. Scan and select moments: pipeline/scan.md
+      - 2. Beat-synced montage: pipeline/montage.md
+      - 3. Music: pipeline/music.md
+      - 4. Voice and on-screen text: pipeline/voice.md
+      - 5. Metadata and upload: pipeline/upload.md
+      - Calm path (Remotion): pipeline/remotion.md
+  - Concepts:
+      - Architecture: architecture.md
+      - Viral DNA: viral-dna.md
+      - Growth plan: growth-plan.md
+  - Reference:
+      - Configuration and data layout: configuration.md
+      - Security and privacy: security.md
+  - Project:
+      - Architecture review: review.md
+      - Roadmap: roadmap.md

@@ -1,0 +1,3 @@
+# Dépendances pour construire le site de documentation (MkDocs Material)
+mkdocs>=1.6,<2
+mkdocs-material>=9.7.7
