@@ -1,0 +1,8 @@
+# Analyse statique : on bloque sur les ERREURS reelles (syntaxe, noms indefinis, imports/variables inutiles).
+# Le style (code dense en une ligne) n'est volontairement pas impose : voir docs/review.md (R20).
+line-length = 120
+target-version = "py312"
+extend-exclude = ["node_modules", "site"]
+
+[lint]
+select = ["E9", "F"]

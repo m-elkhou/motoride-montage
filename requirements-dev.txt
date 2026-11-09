@@ -1,0 +1,4 @@
+# Dependances pour lancer les tests et l'analyse statique (CI incluse)
+pytest>=8
+numpy>=2
+ruff>=0.6
