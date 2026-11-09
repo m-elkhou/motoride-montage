@@ -1,7 +1,8 @@
 # Pipeline
 
 Each stage reads files written by the previous one. Nothing is passed in memory, so any stage can be
-re-run on its own.
+re-run on its own, and `python run_pipeline.py` chains them (stopping at the first failure; the upload only on
+request).
 
 | # | Stage | Reads | Writes |
 |---|---|---|---|
@@ -13,8 +14,9 @@ re-run on its own.
 | 2 | [Render](montage.md) · `render_batch.py` | manifest + segments + music | `out/<id>.mp4` |
 | 3 | [Music](music.md) | — | `public/*.mp3` (yours) |
 | 4 | [Voice](voice.md) · `gen_vo_edge.py` | manifest | `vo/<id>.mp3` |
-| 4 | [Voice](voice.md) · `overlay_vo.py` | `out/`, `vo/` | `out/<id>.mp4` (overwritten) |
-| 5 | [Upload](upload.md) | `meta/*.json` + videos | YouTube + `meta/_uploaded_*.json` |
+| 4 | [Voice](voice.md) · `overlay_vo.py` | `out/`, `vo/` | `out/<id>.mp4` (voice mixed in, `.voiced` marker: safe to repeat) |
+| 5 | [Metadata](upload.md) · `make_meta.py` | manifest + `out/` | `meta/<id>.json` |
+| 5 | [Upload](upload.md) · `upload_short.py` | `meta/*.json` + videos | YouTube + the ledger `meta/_uploaded.json` |
 
 !!! info "Two render paths"
     The **viral path** (this page) is `viral_cut.py` with ffmpeg. The **[calm path](remotion.md)** is a

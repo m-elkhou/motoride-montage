@@ -1,19 +1,15 @@
 # Architecture review
 
-Review of the repository as published on **2026-11-09**, covering the scan, planning, rendering, voice and
-upload stages and the Remotion path. Findings come from **reading the code**. The behaviours marked
-**confirmed** were also seen failing or working during real runs on the author's footage; the rest were not
-exercised against fresh data.
+Review of the repository on **2026-11-09**, covering the scan, planning, rendering, voice and upload stages and
+the Remotion path. The findings came from **reading the code**; most were then **fixed the same day**, and each
+fix was checked against the author's real data (see [Verification](#verification)).
 
 ## Verdict
 
-The pipeline is **coherent and produces results**: 26 unique montages were generated, rendered, voiced and
-queued for upload in one session. The design (file-based stages, pre-selected moments, zero clip reuse,
-claim-free music) is sound and worth keeping.
-
-What holds it back from being a reusable tool is **portability and operability**, not the algorithm:
-hard-coded paths, an implicit stage order, one missing step, a few non-idempotent or destructive scripts, and
-no tests.
+The pipeline is **coherent and produces results**: 28 unique montages were generated, rendered, voiced and
+queued for upload. The design (file-based stages, pre-selected moments, zero clip reuse, claim-free music) is
+sound. What held it back from being reusable was **portability and operability**, not the algorithm. Those are
+now addressed; two items stay open because they are design decisions, not defects.
 
 ## Strengths
 
@@ -24,56 +20,79 @@ no tests.
 | Zero reuse | a global `used` set prevents the same clip appearing in two montages |
 | Quality gates | moto score, window score, brightness and distinct-clip thresholds filter weak material early |
 | Rights-aware | claim-free music only; perceptual-hash filter against already-published clips |
-| Resumable scan | `moments.py` appends one JSON line per clip and resumes after an interruption |
-| Hang protection | renders have a timeout after a real ffmpeg hang (**confirmed**) |
-| Robust upload loop | resumable chunks, quota retry, network retry, scheduled `publishAt` (**confirmed**) |
+| Resumable | scan, classification, voice, mix and renders all skip finished work |
+| Safe upload loop | validated up front, per-upload ledger, quota and network retry, scheduled `publishAt` |
 
-## Findings
+## Status of the findings
 
-Severity: **P1** fix before others reuse it · **P2** fix soon · **P3** polish.
+**Fixed** · **Partly** (improved, a remainder is listed) · **Open** (a decision, not a defect).
 
 ### P1
 
-| ID | Finding | Evidence | Fix |
+| ID | Finding | Status | What changed |
 |---|---|---|---|
-| R1 | **Hard-coded absolute paths** (`C:/workdir/...`, `C:/Users/<name>/...`, `C:/ffmpeg/bin`, a separate venv) in about 14 files. The repository cannot run elsewhere. (The one occurrence of a Windows user name was already replaced by `Path.home()`.) | `grep` over `*.py`, `*.ps1` | one `paths` module reading a git-ignored local file and environment variables, with defaults relative to the repo |
-| R2 | **Missing step: manifest → `meta/*.json`.** `gen_batch.py` writes the manifest, `upload_short.py` needs meta files, and no script converts one into the other. It was done by hand once. | no writer of `meta/` in the repo | add `scan/make_meta.py` (skip existing files unless `--force`) |
-| R3 | **`render_batch.py` kills every ffmpeg on the machine** (`taskkill /IM ffmpeg.exe /F`) after a timeout. A concurrent job elsewhere is destroyed. (**confirmed**: another job's ffmpeg was in the way during a hang.) | `render_batch.py:16` | run ffmpeg as a child with `subprocess.run(timeout=)` / process group and kill only that process tree |
-| R4 | **`overlay_vo.py` is not idempotent.** It replaces `out/<id>.mp4` in place; a second run mixes the voice twice. | `overlay_vo.py` (`shutil.move(tmp, vid)`) | write to `out_voiced/` or keep a marker file per id |
-| R5 | **Upload results written only at the end.** `done` is dumped after the loop, so a crash or kill loses every id uploaded so far; a bad meta file stops the whole batch (`assert` outside `try`); the catch-all `except (..., Exception)` hides real bugs. | `upload_short.py:21,39,44` | append each success to the results file immediately; validate all metas up front; narrow the exceptions |
-| R6 | **Hidden dependency on social2shorts** (credentials, token path, duplicate store) is declared nowhere; the uploader only works under `uv run` from the other project. | `upload_short.py:10-11,18` | document it (done) and, better, make the sibling path and import explicit and testable |
+| R1 | Hard-coded absolute paths in ~14 files | **Fixed** | `mm_paths.py`: environment variable → `local_paths.json` → default. No absolute path left in the code ([Configuration](configuration.md)) |
+| R2 | Manifest → `meta/*.json` step missing | **Fixed** | `scan/make_meta.py` (never overwrites, **refuses to run without a signature**) |
+| R3 | `render_batch.py` killed every ffmpeg on the machine | **Fixed** | `mm_run.run_tree` kills only the render's own process tree and deletes the partial file |
+| R4 | `overlay_vo.py` mixed the voice twice on a re-run | **Fixed** | `out/<id>.voiced` marker holding the file signature; a re-render invalidates it automatically |
+| R5 | Upload results written only at the end; bad meta stopped the batch; catch-all `except` | **Fixed** | all metas validated first; ledger written after **each** upload; narrow exception handling |
+| R6 | Hidden dependency on social2shorts | **Fixed** | explicit import with a clear message, `MM_S2S_ROOT`, documented |
 
 ### P2
 
-| ID | Finding | Fix |
-|---|---|---|
-| R7 | **Implicit stage order**, relative paths that require the repo root as working directory, no orchestrator. | a small `run_pipeline.py` or Makefile with named stages and a `--from/--to` |
-| R8 | **Three voice generators** with incompatible outputs (`.mp3` edge-tts vs `.wav` Chatterbox) and overlapping roles. | keep one generator behind a common interface, archive the rest |
-| R9 | **Duplicate / obsolete scripts**: `prune_render.py` is superseded by `rerender_phonk.py`; exclusion lists differ between `build_montages.py` and `gen_batch.py`. | delete or move to `legacy/`; share one exclusion source |
-| R10 | **Two montage engines**: social2shorts has its own `montage` package; this repository has `viral_cut.py`. Same job, two code paths, two sets of bugs. | decide a home for the engine and share it |
-| R11 | **`containsSyntheticMedia` hard-coded `false`** while a text-to-speech voice is mixed in. | read it from the meta file; re-check YouTube's current disclosure rules |
-| R12 | **`classify.py`** writes a checkpoint it never reloads, forces `-hwaccel cuda`, has no timeout and ignores ffmpeg's return code. **`moments.py`** parses ffmpeg output with a regex and silently yields empty arrays if ffmpeg fails. | reload the checkpoint, check return codes, make CUDA optional |
-| R13 | **`check_published.py` caches by file name**, so a replaced file keeps a stale hash. | key by size + mtime or content hash |
-| R14 | **Inline editorial data**: personal-footage dates (`EXCL_DATE`), hooks, titles and the schedule start date live inside `gen_batch.py`. | move to a git-ignored `copy.toml` / `config.toml`; ship a sample |
-| R15 | **No tests and no CI** beyond the docs build. The beat grid, window picking and manifest generation are pure functions that are easy to test. | add `pytest` for `music_grid`, `best_window`, `gen_batch` invariants (no reused clip) |
+| ID | Finding | Status | What changed |
+|---|---|---|---|
+| R7 | Implicit stage order, relative paths | **Fixed** | `run_pipeline.py` (`--from/--to/--only`, upload only on request and dry-run by default); scripts run from any folder |
+| R8 | Three voice generators, incompatible outputs | **Fixed** | one generator in the pipeline (`gen_vo_edge.py`, resumable, retries); the cloned-voice script moved to `scan/legacy/` |
+| R9 | Duplicate scripts, diverging exclusion lists | **Fixed** | obsolete scripts in `scan/legacy/`; one `exclude_dates` list shared by `gen_batch.py` and `build_montages.py` |
+| R10 | Two montage engines (social2shorts and `viral_cut.py`) | **Open** | decision needed on where the engine lives |
+| R11 | `containsSyntheticMedia` hard-coded `false` | **Fixed** | read from the meta file |
+| R12 | `classify.py` and `moments.py` fragile | **Fixed** | checkpoint reloaded, CUDA only if available, return codes checked, timeouts, failures recorded instead of empty arrays |
+| R13 | Published-hash cache keyed by file name | **Fixed** | key = name + size + modification date |
+| R14 | Editorial data inline | **Partly** | excluded dates, used montages, schedule, themes and texts now come from `scan/gen_config.json`; the **default** hooks, titles and descriptions remain in the code |
+| R15 | No tests, no CI | **Fixed** | 34 tests, ruff, CI on Linux and Windows |
 
 ### P3
 
-| ID | Finding | Fix |
-|---|---|---|
-| R16 | **Windows-only**: `NUL`, `taskkill`, `C:/Windows/Fonts/arialbd.ttf`, PowerShell launcher. | `os.devnull`, process-tree kill, a font path setting |
-| R17 | **Remotion path is disconnected**: nothing in the viral path calls it; `captions` defaults empty; template placeholders remain in `Root.tsx`. | either wire it or move it under `calm/` |
-| R18 | **Launcher lists 26 meta files by hand** in `_upload_launch.ps1`. | accept a glob or a folder |
-| R19 | **`gen_batch.py` is not seeded**; the "unique clip" guarantee holds per run but not across runs unless old montage files are present. | persist the used-clip set |
-| R20 | Style: dense one-line code in `viral_cut.py` and `upload_short.py`, bare `except:`, `tempfile.mktemp`. | lint with `ruff`, use `NamedTemporaryFile` |
+| ID | Finding | Status | What changed |
+|---|---|---|---|
+| R16 | Windows-only calls | **Partly** | `os.devnull`, configurable font, process-tree kill that also works on POSIX. Remaining: the PowerShell launcher |
+| R17 | Remotion path disconnected | **Open** | kept as the secondary "calm" path and documented as such; wire it or retire it |
+| R18 | Launcher listed 26 files by hand | **Fixed** | pattern parameter; the uploader also accepts quoted patterns |
+| R19 | `gen_batch.py` used-clip set | **Partly** | the used montages are now configurable (`used_montages`); the planner is already deterministic (verified byte for byte), so there is nothing to seed |
+| R20 | Style: bare `except`, `mktemp`, dead imports | **Partly** | bare excepts, `mktemp` and unused imports/variables fixed; the dense one-line style is left, only real errors are enforced |
+
+### R21: renders that never finished (found while fixing)
+
+Two montages (`g_pov_05`, `g_pov_07`) had been abandoned after repeated hangs. **Root cause**, found by bisecting
+the final ffmpeg command: encoding video and audio in **one filter graph** froze deterministically (same frame,
+same output size every time) with ffmpeg 9.0.2. Encoding the video alone takes about 10 s, so the filters were
+not at fault; `-t`, the muxing queue size and filter threads made no difference.
+
+**Fix**: the final step now runs in two passes: video only, then audio mixed in while **copying** the video
+(about 1 s). The output is the same (same codecs, size, hook and outro text) and both montages now render in
+seconds. `viral_cut.py` also stopped leaving ~5 GB of temporary folders behind.
+
+## Verification
+
+| Check | Result |
+|---|---|
+| `moments.py` re-scan of a real clip vs the stored result | all 8 measured values identical; a missing file is now reported |
+| `gen_batch.py` on the real data | manifest and 28 segment files **identical byte for byte** |
+| `make_meta.py` vs the 26 queued metadata files | **26 / 26 identical**, signature included |
+| `overlay_vo.py` after migrating markers | second run mixes nothing (`0 OK, 26 already done`); only the 2 new videos were voiced afterwards |
+| Process-tree timeout | a test kills a child **and** its grandchild while an unrelated process survives; a negative control shows the test detects orphans; a real hang was killed without touching the running uploader |
+| End-to-end render | 1080x1920, 30 fps, H.264 + AAC, 18.0 s, hook and outro text visible |
+| Test suite | 34 passed locally; CI runs on Linux and Windows |
 
 ## Risks to watch
 
 1. **Cadence depends on the PC being on**: the detached uploader needs the machine awake for up to 30 hours.
 2. **Platform rules change**: music claims, upload quotas and disclosure requirements evolve; re-verify before each large batch.
 3. **Single source of OAuth truth**: all uploads depend on one token in the sibling project.
+4. **ffmpeg upgrades**: a major version can change scheduling behaviour; the render timeout and the failure report are the safety net.
 
-## Suggested order
+## What is left
 
-R1 + R2 + R3 + R4 + R5 first (one afternoon, no change in behaviour for the owner thanks to defaults),
-then R7 + R15 (an orchestrator and a safety net), then the rest. See the [roadmap](roadmap.md).
+See the [roadmap](roadmap.md): the engine-ownership decision (R10), wiring or retiring Remotion (R17), moving the
+remaining default copy out of the code (R14), a portable launcher (R16), and the analytics loop.

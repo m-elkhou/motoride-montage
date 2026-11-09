@@ -4,9 +4,9 @@
 
 | Need | Used by | Notes |
 |---|---|---|
-| Windows 10/11 | whole pipeline | a few paths and `taskkill`/`NUL` calls are Windows-only today |
+| Windows 10/11 (Linux/macOS mostly fine) | whole pipeline | the PowerShell launcher is Windows-only; everything else uses portable calls |
 | Python 3.12 | all scripts | one venv for scan/render/voice |
-| ffmpeg + ffprobe | everything | currently expected at `C:/ffmpeg/bin/` |
+| ffmpeg + ffprobe | everything | on `PATH`, or set `MM_FFMPEG` / `MM_FFPROBE` ([Configuration](configuration.md)) |
 | `librosa`, `numpy`, `Pillow` | `viral_cut.py`, `moments.py` | beat tracking and scoring |
 | `torch`, `open_clip_torch` | `classify.py` | CLIP ViT-B-32, CUDA optional but fast |
 | `edge-tts` | `gen_vo_edge.py` | online neural voice, needs network |
@@ -15,30 +15,40 @@
 
 ## Run it end to end
 
-All scripts expect the **repository root as working directory** (they use relative paths).
+One command runs the stages in order and stops at the first failure:
 
 ```console
-# 1. find and score the footage
-python scan/inventory.py
-python scan/moments.py
-python scan/classify.py
-
-# 2. plan N unique montages (hooks, titles, schedule)
-python scan/gen_batch.py
-
-# 3. put your claim-free music in public/ (see Music), then render
-python scan/render_batch.py
-
-# 4. voice, then mix it in (run overlay ONCE, see the review)
-python scan/gen_vo_edge.py
-python scan/overlay_vo.py
-
-# 5. write meta/<id>.json (see Upload) and send
-python upload_short.py meta/g_pov_00.json --dry-run
+python run_pipeline.py --list                 # the stages
+python run_pipeline.py                        # inventory -> meta (never uploads)
+python run_pipeline.py --from plan --to mix   # a range
+python run_pipeline.py --only render
+python run_pipeline.py --to upload            # adds the upload, as a DRY RUN
+python run_pipeline.py --to upload --yes-upload   # real upload to YouTube
 ```
 
-!!! danger "Run `overlay_vo.py` once"
-    It rewrites `out/<id>.mp4` in place. Running it twice mixes the voice in twice. Re-render first.
+The upload is the only stage that acts outside your machine, so it runs **only when asked** and stays a
+simulation without `--yes-upload`. Every stage can also be run on its own, **from any folder**:
+
+```console
+python scan/inventory.py && python scan/moments.py && python scan/classify.py
+python scan/gen_batch.py                # plan N unique montages
+python scan/render_batch.py             # needs your claim-free music in public/
+python scan/gen_vo_edge.py              # short voice
+python scan/overlay_vo.py               # safe to repeat: already-voiced videos are skipped
+python scan/make_meta.py                # meta/<id>.json with your signature + hashtags
+uv run python upload_short.py "meta/g_*.json" --dry-run    # from the social2shorts folder
+```
+
+All stages are **re-runnable**: finished renders, voices and mixes are skipped, so after a failure you simply run
+the same command again.
+
+## Tests
+
+```console
+pip install -r requirements-dev.txt
+python -m pytest tests -q      # no ffmpeg, no network, no YouTube needed
+ruff check .
+```
 
 ## One montage by hand
 

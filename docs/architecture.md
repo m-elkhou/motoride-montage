@@ -57,6 +57,9 @@ flowchart TB
 | Rendering | `viral_cut.py`, `scan/render_batch.py` | beat-synced cut, text, master |
 | Audio | `scan/gen_vo_edge.py`, `scan/overlay_vo.py` | short voice, mixed under the music |
 | Publishing | `upload_short.py`, `scan/_upload_launch.ps1` | quota-aware scheduled upload |
+| Metadata | `scan/make_meta.py` | `meta/<id>.json` with signature and hashtags |
+| Orchestration | `run_pipeline.py` | named stages, `--from/--to/--only`, upload only on request |
+| Shared | `mm_paths.py`, `mm_run.py`, `mm_config.py` | paths and tools, safe process runner, editorial config |
 | Calm path | `src/`, `make_one.py`, `gen_batch_vo.py` | Remotion narrated renderer (secondary) |
 
 ## Contracts between stages
@@ -69,7 +72,7 @@ The JSON files are the interfaces:
 | `scan/clip_tags.json` | `classify.py` | `gen_batch.py` | per path: `top`, `moto` |
 | `scan/mont/<id>.json` | `gen_batch.py` | `viral_cut.py` | `[{clip,start,len,score}]` |
 | `scan/batch_manifest.json` | `gen_batch.py` | `render_batch.py`, `gen_vo_edge.py`, `overlay_vo.py` | `id,theme,music,hook,outro,title,tags,target,publishAt` |
-| `meta/<id>.json` | *(manual today)* | `upload_short.py` | `video,title,description,tags,categoryId,lang,privacy,publishAt` |
+| `meta/<id>.json` | `make_meta.py` | `upload_short.py` | `video,title,description,tags,categoryId,lang,privacy,publishAt` |
 
 ## Boundary with social2shorts
 
@@ -80,10 +83,11 @@ one place.
 
 ## Operating model
 
-- **Idempotence by file existence**: renders skip outputs over 200 KB and `moments.py` resumes by line.
-  The voice step (`gen_vo_edge.py`) and `overlay_vo.py` are **not** idempotent; see the review.
-- **Timeouts**: inventory, moments, rendering (240 s) and the voice mix (120 s) have timeouts. Classification
-  and `build_montages.py` do not yet.
-- **Windows host**: paths, `NUL`, fonts and `taskkill` assume Windows today.
+- **Every stage is re-runnable**: renders skip valid outputs, the voice skips existing files, the mix writes a
+  `.voiced` marker, `moments.py` and `classify.py` resume, `make_meta.py` never overwrites, the uploader keeps a ledger.
+- **Timeouts everywhere**: every ffmpeg call is bounded; a render that exceeds its timeout has **its own process tree**
+  killed (never other jobs) and its partial file removed.
+- **Portable**: paths come from `mm_paths.py` (environment, `local_paths.json`, defaults); only the PowerShell
+  launcher is Windows-specific.
 - **Unattended uploads**: the PowerShell launcher starts `upload_short.py` detached so it survives the
   terminal closing; it retries on quota limits for up to 30 h. The PC must stay on.

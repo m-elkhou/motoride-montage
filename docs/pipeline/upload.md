@@ -1,47 +1,73 @@
 # 5. Metadata and upload
 
-## Metadata files
+## Metadata: `scan/make_meta.py`
 
-Each montage needs a `meta/<id>.json`:
+`gen_batch.py` writes titles, tags and `publishAt` into `batch_manifest.json`. `make_meta.py` turns it into one
+`meta/<id>.json` per montage, which is what the uploader reads:
+
+```console
+python scan/make_meta.py                       # signature read from social2shorts' config.toml
+python scan/make_meta.py --signature "📸 Follow me on Instagram: @handle"
+```
 
 ```json
 {
-  "video": "out/g_pov_00.mp4",
+  "video": "…/out/g_pov_00.mp4",
   "title": "…  #Shorts",
-  "description": "<one-line hook>\n\n<your signature line>\n\n<hashtags> #Shorts",
-  "tags": ["moto", "motovlog"],
+  "privacy": "private",
+  "publishAt": "2026-11-12T17:00:00Z",
   "categoryId": "2",
   "lang": "fr",
-  "privacy": "public",
-  "publishAt": "2026-11-12T17:00:00Z"
+  "tags": ["moto", "motovlog"],
+  "description": "<theme hook>\n\n<about line>\n\n<your signature>\n\n#moto #motovlog … #Shorts"
 }
 ```
 
-`gen_batch.py` already writes title, tags and `publishAt` into `batch_manifest.json`. **Turning the manifest
-into `meta/*.json` is not scripted yet** (see the [review](../review.md)). The description should always
-carry your signature and hashtags.
+- The description is always: hook of the theme, about line, **your signature**, then the hashtags.
+- **No signature, no file**: the script stops unless you pass `--no-signature`.
+- Existing meta files are never overwritten without `--force`; a montage without a video is skipped with a warning.
+- Texts can be overridden in `scan/gen_config.json` (`descriptions`).
 
-## `upload_short.py`
+## Uploading: `upload_short.py`
 
-Uploads each meta file with the YouTube Data API (`videos.insert`, resumable, 8 MB chunks).
+```console
+uv run python upload_short.py "meta/g_*.json" --dry-run      # from the social2shorts folder
+uv run python upload_short.py "meta/g_*.json" --retry-min 45 --max-hours 30
+```
 
-- `publishAt` set: the video is uploaded **private** and goes public at that time.
-- `uploadLimitExceeded`: waits `--retry-min` minutes and retries until `--max-hours`.
-- Network errors: up to 5 retries, 20 s apart, with a 180 s socket timeout.
-- `--dry-run` prints what would be sent; `--not-before HH:MM` delays the start.
-- Writes `meta/_uploaded_<date>.json` (file → video id) when the batch ends.
+Arguments are files or **quoted patterns** (`*`, `?`, `[…]`); files starting with `_` are never treated as metadata.
 
-## OAuth and the YouTube client
+| Behaviour | Detail |
+|---|---|
+| **Validated up front** | every meta is checked (fields, title ≤ 100, video exists, `privacy`, `publishAt`) **before** the first upload; an invalid one is reported and skipped, it no longer stops the batch |
+| **Upload ledger** | each success is written to `meta/_uploaded.json` **immediately** (atomic write). A crash loses nothing, and a relaunch skips what already left. Older `meta/_uploaded_*.json` files are read too |
+| Scheduling | `publishAt` set ⇒ uploaded **private**, public at that time |
+| Quota | `uploadLimitExceeded` ⇒ wait `--retry-min` minutes and retry until `--max-hours` |
+| Network | up to 5 retries, 20 s apart, 180 s socket timeout |
+| Synthetic media | `containsSyntheticMedia` is read from the meta file (default `false`) |
+| `--dry-run` | validates and lists, needs **no network and no token** |
+| Exit code | `0` if everything left, `1` if failures or invalid files remain |
 
-The uploader reuses the OAuth client and token of **social2shorts**
-(`secrets/client_secret.json`, `secrets/token.json`) and its `get_credentials()`. Set the client up once with
-social2shorts' guide, then run the uploader with `uv run` from that project so `social2shorts` is importable.
+!!! warning "Disclosure flag"
+    Re-check YouTube's current altered/synthetic content rules for your use of a text-to-speech voice, and set
+    `"containsSyntheticMedia": true` in the meta file if they apply.
+
+### Unattended run
+
+`scan/_upload_launch.ps1` finds `meta/g_*.json` itself (pattern, retry and hours are parameters) and runs the
+uploader from the social2shorts project. Start it **detached** so it survives the terminal:
+
+```powershell
+Start-Process powershell -ArgumentList '-NoProfile','-File','scan\_upload_launch.ps1' -WindowStyle Hidden
+```
+
+### OAuth and the YouTube client
+
+The uploader reuses the OAuth client and token of **social2shorts** (`secrets/client_secret.json`,
+`secrets/token.json`) and its `get_credentials()`. If `social2shorts` cannot be imported, the script says so and
+points to `MM_S2S_ROOT` instead of failing with a stack trace. Set the client up once with social2shorts' guide.
 
 !!! info "Upload limits"
     Unverified channels are throttled to roughly 15 uploads per 24 h. Verifying the channel for
     *Advanced features* (6-second selfie video, ID, or channel history) lifts it. The review takes about
     24 h; re-submitting restarts the clock.
-
-!!! warning "Disclosure flag"
-    `containsSyntheticMedia` is currently hard-coded to `false`. Re-check YouTube's current altered/synthetic
-    content rules for your use of a text-to-speech voice, and read the value from the meta file if needed.

@@ -6,8 +6,8 @@ The `.gitignore` is deliberately strict. It excludes, by category:
 
 | Category | Examples |
 |---|---|
-| **Secrets** | `.env*`, `secrets/`, `client_secret*.json`, `token*.json`, `*.pem`, `*.key`, `credentials*.json`, `auth.log`, `auth.err` |
-| **Data and state** | `data/`, `out/`, `props/`, `vo/`, `meta/`, `specs/`, `manifest.json`, `scan/*.json`, `scan/*.jsonl`, `scan/mont/`, databases, caches |
+| **Secrets** | `.env*`, `secrets/`, `client_secret*.json`, `token*.json`, `*.pem`, `*.key`, `credentials*.json`, `auth.log`, `auth.err`, `local_paths.json` |
+| **Data and state** | `data/`, `out/`, `props/`, `vo/`, `meta/`, `specs/`, `manifest.json`, `scan/*.json` (including `scan/gen_config.json`), `scan/*.jsonl`, `scan/mont/`, the upload ledger `meta/_uploaded.json`, databases, caches |
 | **Media** | all video, audio and image formats, and the whole `public/` folder (your footage, your music) |
 | **Logs and backups** | `*.log`, `*.err`, `*.bak*`, temp files |
 | **Tooling** | `node_modules/`, `__pycache__/`, virtualenvs, IDE and assistant session folders, the generated `site/` |

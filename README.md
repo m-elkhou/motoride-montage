@@ -29,15 +29,22 @@ raw clips -> inventory -> moments -> classify (CLIP) -> gen_batch (plan)
 
 ## Quick start
 
-Requires Windows, Python 3.12, ffmpeg, and for the full pipeline `librosa`, `torch` + `open_clip_torch`,
-`edge-tts`. See [Getting started](https://m-elkhou.github.io/motoride-montage/getting-started/).
+Requires Python 3.12, ffmpeg, and for the full pipeline `librosa`, `torch` + `open_clip_torch`, `edge-tts`.
+See [Getting started](https://m-elkhou.github.io/motoride-montage/getting-started/).
 
 ```console
-python scan/inventory.py && python scan/moments.py && python scan/classify.py
-python scan/gen_batch.py
-python scan/render_batch.py
-python scan/gen_vo_edge.py && python scan/overlay_vo.py   # overlay: run once
-python upload_short.py meta/<id>.json --dry-run
+python run_pipeline.py --list              # the stages
+python run_pipeline.py                     # inventory -> meta (never uploads)
+python run_pipeline.py --to upload         # + upload, as a dry run
+python run_pipeline.py --to upload --yes-upload   # real upload
+```
+
+Every stage is re-runnable (finished work is skipped) and can be run alone from any folder. Settings: paths in
+`local_paths.json` / `MM_*` variables, editorial choices in `scan/gen_config.json`
+([Configuration](https://m-elkhou.github.io/motoride-montage/configuration/)).
+
+```console
+pip install -r requirements-dev.txt && python -m pytest tests -q   # 34 tests, no ffmpeg/network needed
 ```
 
 ## What is NOT in this repository
@@ -48,8 +55,7 @@ git-ignored by design. You bring your own clips and your own claim-free music. S
 
 ## Status
 
-A working personal tool published as-is. Paths are Windows-oriented and some are still hard-coded.
-The [architecture review](https://m-elkhou.github.io/motoride-montage/review/) lists every known gap and the
+A working personal tool. The [architecture review](https://m-elkhou.github.io/motoride-montage/review/) lists each finding with its status and the
 [roadmap](https://m-elkhou.github.io/motoride-montage/roadmap/) the planned fixes.
 
 ## Licences

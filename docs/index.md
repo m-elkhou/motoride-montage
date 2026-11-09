@@ -23,7 +23,10 @@ It is the **montage engine** that sits next to [social2shorts](https://github.co
 | Planning | `scan/gen_batch.py` | N themed montages, **zero clip reuse**, hooks, titles, schedule |
 | Rendering | `scan/render_batch.py` → `viral_cut.py` | 1080x1920, 30 fps, beat-synced, slow-mo on the drop |
 | Voice | `scan/gen_vo_edge.py` + `scan/overlay_vo.py` | short neural voice mixed lightly over the music |
-| Upload | `upload_short.py` | scheduled, quota-aware YouTube upload |
+| Metadata | `scan/make_meta.py` | `meta/<id>.json` with your signature and hashtags |
+| Upload | `upload_short.py` | scheduled, quota-aware YouTube upload with a per-upload ledger |
+
+One command chains them: `python run_pipeline.py` (see [Getting started](getting-started.md)).
 
 ```mermaid
 flowchart LR
@@ -46,6 +49,6 @@ flowchart LR
 - **Never republish.** Clips are used once across all montages; published clips are filtered by perceptual hash.
 - **Your data stays yours.** Footage, music, tokens and channel data are never committed ([Security](security.md)).
 
-!!! warning "Status"
-    This is a working personal tool, published as-is. Paths are Windows-oriented and a few are still
-    hard-coded; the [architecture review](review.md) lists every known gap and the planned fixes.
+!!! info "Status"
+    A working personal tool. The [architecture review](review.md) lists each finding with its status (most were
+    fixed on the day of the review, with 34 tests and CI on Linux and Windows); two design decisions remain open.
