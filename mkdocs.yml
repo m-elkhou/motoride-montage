@@ -72,6 +72,7 @@ nav:
       - 2. Beat-synced montage: pipeline/montage.md
       - 3. Music: pipeline/music.md
       - 4. Voice and on-screen text: pipeline/voice.md
+      - Privacy gate: pipeline/privacy.md
       - 5. Metadata and upload: pipeline/upload.md
       - Calm path (Remotion): pipeline/remotion.md
   - Concepts:
@@ -84,3 +85,5 @@ nav:
   - Project:
       - Architecture review: review.md
       - Roadmap: roadmap.md
+      - TODO: todo.md
+      - Handoff: handoff.md

@@ -1,6 +1,6 @@
 # Growth plan — Plan de croissance vers 10 M d'abonnés
 
-*Écrit pour le propriétaire de la chaîne (@motoride-mh). Objectif : un système qui compose, pas un coup de chance. 10M, c'est ~2-3 ans de constance si le système tient. On construit la machine, pas une vidéo.*
+*Écrit pour le propriétaire de la chaîne. Objectif : un système qui compose, pas un coup de chance. 10M, c'est ~2-3 ans de constance si le système tient. On construit la machine, pas une vidéo.*
 
 !!! warning "Document stratégique du 06/11/2026"
     Écrit avant le passage au moteur *viral* : la voix posée et la musique calme du plan initial ont été remplacées par du phonk libre, un hook texte et une voix très courte (voir [Pipeline](pipeline/index.md)). Les principes de cadence, d'analyse hebdomadaire et de multi-langue restent valables.
@@ -48,7 +48,7 @@ Personne n'atteint 10M avec des vidéos isolées. On y arrive avec **un format r
 ## 8. Distribution hors YouTube (le même asset, partout)
 - Repost systématique sur **Instagram Reels + TikTok** (le contenu vient déjà de là ; on boucle). Chaque plateforme a son algorithme : 3x la surface pour 0 tournage de plus.
 - Bio/liens croisés : chaque plateforme pousse vers la chaîne YouTube.
-- Description YouTube : toujours emojis + hashtags + `📸 Instagram : @motoride.mh` (règle déjà actée).
+- Description YouTube : toujours emojis + hashtags + le lien vers le compte Instagram associé (règle déjà actée).
 
 ## 9. La boucle d'analyse (ce qui fait la différence à l'échelle)
 Chaque semaine, dans YouTube Studio, on lit **3 chiffres par short** :

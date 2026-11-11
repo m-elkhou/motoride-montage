@@ -15,7 +15,7 @@ import pytest
 @pytest.fixture
 def sandbox(tmp_path, root):
     (tmp_path / "scan" / "mont").mkdir(parents=True)
-    for f in ("mm_paths.py", "mm_config.py"):
+    for f in ("mm_paths.py", "mm_config.py", "mm_privacy.py"):
         shutil.copy(root / f, tmp_path / f)
     shutil.copy(root / "scan" / "gen_batch.py", tmp_path / "scan" / "gen_batch.py")
 
@@ -34,6 +34,12 @@ def sandbox(tmp_path, root):
     add("x", 12, "moto_pov", "20230822")      # date a exclure
     (tmp_path / "scan" / "moments.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
     (tmp_path / "scan" / "clip_tags.json").write_text(json.dumps(tags), encoding="utf-8")
+    # pool ANONYMAT : seuls les clips pov / rider ont ete analyses (les "crew" ne le sont pas : interdits)
+    pool = {r["path"]: {"sig": "x", "windows": [{"start": 0.5, "end": 12.5, "frames": 36, "hits": [],
+                                                  "clean": [[0.6, 5.4], [7.6, 12.4]]}]}
+            for r in rows if ("p" in r["name"].split("_")[1][:1] or "r" in r["name"].split("_")[1][:1])
+            and not r["name"].startswith("20230822")}
+    (tmp_path / "scan" / "privacy_pool.json").write_text(json.dumps(pool), encoding="utf-8")
     (tmp_path / "scan" / "gen_config.json").write_text(json.dumps({
         "exclude_dates": ["20230822"], "schedule_start": "2026-11-12T17:00:00Z", "slot_hours": [17, 10],
         "themes": {"pov": [["moto_pov"], 4], "rider": [["rider"], 3], "crew": [["group_ride"], 2]}}), encoding="utf-8")
@@ -53,7 +59,7 @@ def run(sandbox):
 def test_counts_follow_the_config(sandbox):
     manifest, _ = run(sandbox)
     assert [m["theme"] for m in manifest].count("pov") == 4
-    assert len(manifest) == 4 + 3 + 2
+    assert len(manifest) == 4 + 3            # le theme "crew" n'a aucun clip verifie : aucun montage
 
 
 def test_no_clip_is_used_twice_across_montages(sandbox):
@@ -68,7 +74,8 @@ def test_no_clip_is_used_twice_across_montages(sandbox):
 def test_each_montage_has_enough_distinct_clips(sandbox):
     _, mont = run(sandbox)
     for mid, segs in mont.items():
-        assert len({s["name"] for s in segs}) >= 4, mid
+        assert len({s["name"] for s in segs}) >= 5, mid
+        assert len(segs) >= 10, mid
         assert max(list(s["name"] for s in segs).count(n) for n in {s["name"] for s in segs}) <= 2, mid
 
 
@@ -89,3 +96,84 @@ def test_deterministic(sandbox):
     first, _ = run(sandbox)
     second, _ = run(sandbox)
     assert first == second
+
+
+def test_only_verified_intervals_are_used(sandbox):
+    """Chaque segment est entierement dans un intervalle propre du pool (marge de securite comprise)."""
+    _, mont = run(sandbox)
+    for segs in mont.values():
+        for s in segs:
+            end = s["start"] + s["len"]
+            assert (0.75 <= s["start"] and end <= 5.25) or (7.75 <= s["start"] and end <= 12.25)
+            assert s["len"] >= 2.6
+
+
+def test_unanalysed_clips_are_never_planned(sandbox):
+    _, mont = run(sandbox)
+    assert all("_c" not in s["name"] for segs in mont.values() for s in segs)
+
+
+def test_blocked_ranges_are_removed(sandbox):
+    (sandbox / "scan" / "privacy_blocklist.json").write_text(json.dumps(
+        {"/clips/20260101_p000.mp4": [[0.0, 20.0, "visage"]]}), encoding="utf-8")
+    _, mont = run(sandbox)
+    assert all(s["name"] != "20260101_p000.mp4" for segs in mont.values() for s in segs)
+
+
+def test_planner_refuses_to_run_without_the_privacy_pool(sandbox):
+    (sandbox / "scan" / "privacy_pool.json").unlink()
+    r = subprocess.run([sys.executable, "-X", "utf8", "scan/gen_batch.py"], cwd=sandbox, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", timeout=60)
+    assert r.returncode != 0 and "privacy" in (r.stderr + r.stdout)
+
+
+def test_lane_count_is_bounded_by_verified_seconds(sandbox):
+    """60 clips x 2 segments de 4,5 s = 540 s verifiees : avec 400 s reservees par voie, une seule voie pour ce theme."""
+    cfg = json.loads((sandbox / "scan" / "gen_config.json").read_text(encoding="utf-8"))
+    cfg["lane_seconds"] = 400
+    (sandbox / "scan" / "gen_config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    manifest, _ = run(sandbox)
+    assert [m["theme"] for m in manifest].count("pov") == 1
+
+
+def test_a_lane_without_enough_verified_seconds_is_dropped_not_padded(sandbox):
+    cfg = json.loads((sandbox / "scan" / "gen_config.json").read_text(encoding="utf-8"))
+    cfg["min_seconds"] = 500                    # aucun montage ne peut atteindre 500 s verifiees : tous ignores
+    (sandbox / "scan" / "gen_config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    manifest, _ = run(sandbox)
+    assert manifest == []
+
+
+def test_letterboxed_sources_are_never_planned(sandbox):
+    """scan/clip_quality.json (letterbox_scan.py) : une source avec des bandes noires n'est jamais utilisee."""
+    bad = {f"/clips/20260101_p{i:03d}.mp4": {"sig": "x", "bars": 0.6, "letterbox": True} for i in range(0, 30)}
+    (sandbox / "scan" / "clip_quality.json").write_text(json.dumps(bad), encoding="utf-8")
+    _, mont = run(sandbox)
+    banned = {n.split("/")[-1] for n in bad}
+    assert all(s["name"] not in banned for segs in mont.values() for s in segs)
+
+
+def test_identical_copies_of_a_rush_are_planned_once_and_share_their_blocks(sandbox):
+    """inbox + camera_roll : meme nom, meme taille. Le meme plan ne passe jamais deux fois ; une plage bloquee sur une
+    copie vaut pour l'autre."""
+    rows = [json.loads(line) for line in (sandbox / "scan" / "moments.jsonl").read_text(encoding="utf-8").splitlines()]
+    pool = json.loads((sandbox / "scan" / "privacy_pool.json").read_text(encoding="utf-8"))
+    tags = json.loads((sandbox / "scan" / "clip_tags.json").read_text(encoding="utf-8"))
+    extra = []
+    for r in [r for r in rows if "_p" in r["name"]][:40]:
+        d = dict(r, path=r["path"].replace("/clips/", "/inbox/"))
+        extra.append(d)
+        pool[d["path"]] = pool[r["path"]]
+        tags[d["path"]] = tags[r["path"]]
+    (sandbox / "scan" / "moments.jsonl").write_text("\n".join(json.dumps(r) for r in rows + extra), encoding="utf-8")
+    (sandbox / "scan" / "privacy_pool.json").write_text(json.dumps(pool), encoding="utf-8")
+    (sandbox / "scan" / "clip_tags.json").write_text(json.dumps(tags), encoding="utf-8")
+    (sandbox / "scan" / "privacy_blocklist.json").write_text(json.dumps(          # bloque sur la copie /inbox/ seulement
+        {"/inbox/20260101_p001.mp4": [[0.0, 20.0, "visage"]]}), encoding="utf-8")
+    _, mont = run(sandbox)
+    for segs in mont.values():
+        paths = {}
+        for s in segs:
+            paths.setdefault(s["name"], set()).add(s["clip"])
+        assert all(len(v) == 1 for v in paths.values())                      # jamais deux copies du meme rushe
+    assert all(s["name"] != "20260101_p001.mp4" for segs in mont.values() for s in segs)

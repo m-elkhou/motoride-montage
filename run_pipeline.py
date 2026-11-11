@@ -2,7 +2,7 @@
 
   python run_pipeline.py --list
   python run_pipeline.py                      # inventory -> meta (jamais l'envoi)
-  python run_pipeline.py --from plan --to mix # une plage
+  python run_pipeline.py --from plan --to render # une plage
   python run_pipeline.py --only render
   python run_pipeline.py --to upload          # + envoi, en SIMULATION (--dry-run)
   python run_pipeline.py --to upload --yes-upload   # envoi reel sur YouTube
@@ -24,12 +24,13 @@ STAGES = [
     ("inventory", "scan/inventory.py", "liste des clips (ffprobe)"),
     ("moments", "scan/moments.py", "meilleures fenetres par clip (reprise automatique)"),
     ("classify", "scan/classify.py", "etiquettes CLIP + score moto (reprise automatique)"),
-    ("plan", "scan/gen_batch.py", "montages uniques + manifest + calendrier"),
-    ("render", "scan/render_batch.py", "rendu viral_cut.py (saute les rendus valides)"),
-    ("voice", "scan/gen_vo_edge.py", "voix courte edge-tts (saute les voix existantes)"),
-    ("mix", "scan/overlay_vo.py", "voix sous la musique (idempotent)"),
+    ("privacy", "scan/privacy_scan.py", "pool ANONYMAT : intervalles sans visage ni 2e personne (reprise)"),
+    ("plan", "scan/gen_batch.py", "montages uniques depuis le pool propre + manifest + calendrier"),
+    ("voice", "scan/gen_vo_clone.py", "voix courte CLONEE (Chatterbox), debit pose, plusieurs essais par ligne"),
+    ("render", "scan/render_batch.py", "rendu viral_cut.py : video + voix + musique en une passe, controle du flux"),
+    ("check", "scan/privacy_check.py", "audit ANONYMAT image par image + flux audio (puis relecture + approve)"),
     ("meta", "scan/make_meta.py", "meta/<id>.json avec signature + hashtags"),
-    ("upload", "upload_short.py", "envoi YouTube (simulation sauf --yes-upload)"),
+    ("upload", "upload_short.py", "envoi YouTube (montages APPROUVES seulement ; simulation sauf --yes-upload)"),
 ]
 NAMES = [s[0] for s in STAGES]
 DEFAULT_LAST = "meta"
@@ -37,6 +38,8 @@ DEFAULT_LAST = "meta"
 
 def stage_command(name, script, yes_upload):
     root = mm_paths.ROOT
+    if name == "check":
+        return [mm_paths.RENDER_PYTHON, "-X", "utf8", str(root / script), "audit"]
     if name != "upload":
         return [mm_paths.RENDER_PYTHON, "-X", "utf8", str(root / script)]
     try:
