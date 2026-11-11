@@ -2,7 +2,7 @@
 
 
 def test_overlay_marker_roundtrip(tmp_path, load_script):
-    ov = load_script("scan/overlay_vo.py")
+    ov = load_script("scan/legacy/overlay_vo.py")
     video = tmp_path / "a.mp4"
     video.write_bytes(b"x" * 100)
     assert not ov.already_voiced(str(video))      # jamais mixe
@@ -13,7 +13,7 @@ def test_overlay_marker_roundtrip(tmp_path, load_script):
 
 
 def test_overlay_marker_lives_next_to_the_video(tmp_path, load_script):
-    ov = load_script("scan/overlay_vo.py")
+    ov = load_script("scan/legacy/overlay_vo.py")
     assert str(ov.marker_for(str(tmp_path / "g_pov_00.mp4"))).endswith("g_pov_00.voiced")
 
 

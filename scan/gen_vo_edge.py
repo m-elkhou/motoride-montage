@@ -48,11 +48,14 @@ async def main(force):
     ko = []
     for i, m in enumerate(man, 1):
         out = mm_paths.VO / f"{m['id']}.mp3"
-        if out.exists() and out.stat().st_size > MIN_SIZE and not force:
+        txt = out.with_suffix(".txt")
+        line = hook_line(m)
+        same = txt.exists() and txt.read_text(encoding="utf-8").strip() == line   # le hook a-t-il change ?
+        if out.exists() and out.stat().st_size > MIN_SIZE and not force and same:
             print(f"[{i}/{len(man)}] {m['id']} deja", flush=True)
             continue
-        line = hook_line(m)
         if await one(edge_tts, line, out):
+            txt.write_text(line, encoding="utf-8")
             print(f"[{i}/{len(man)}] {m['id']} '{line}'", flush=True)
         else:
             ko.append(m["id"])

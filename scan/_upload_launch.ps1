@@ -5,7 +5,7 @@
 param(
     [int]$RetryMin = 45,
     [int]$MaxHours = 30,
-    [string]$Pattern = 'g_*.json'
+    [string]$Pattern = 'safe_*.json'
 )
 $Root = Split-Path -Parent $PSScriptRoot
 $S2S = if ($env:MM_S2S_ROOT) { $env:MM_S2S_ROOT } else { Join-Path (Split-Path -Parent $Root) 'social2shorts' }

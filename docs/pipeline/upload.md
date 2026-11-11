@@ -19,12 +19,16 @@ python scan/make_meta.py --signature "📸 Follow me on Instagram: @handle"
   "categoryId": "2",
   "lang": "fr",
   "tags": ["moto", "motovlog"],
-  "description": "<theme hook>\n\n<about line>\n\n<your signature>\n\n#moto #motovlog … #Shorts"
+  "description": "<theme hook>\n\n<about>\n\n<call to subscribe>\n\n<your signature>\n\n#moto #motovlog … #Shorts"
 }
 ```
 
-- The description is always: hook of the theme, about line, **your signature**, then the hashtags.
-- **No signature, no file**: the script stops unless you pass `--no-signature`.
+- **Strict description rule** (`mm_description.py`, the same rule is enforced in social2shorts): the description is
+  **always detailed** (hook, presentation, call to subscribe: at least 150 characters over two paragraphs), then
+  **your signature** (it holds your Instagram), then a **last line made only of hashtags** (at least three). The
+  signature is read from the local configuration, never written in the code.
+- **No signature, no file**: the script stops; `--no-signature` exists only for tests and produces a file the uploader
+  **refuses**. `upload_short.py` re-checks every meta against the rule before the first upload.
 - Existing meta files are never overwritten without `--force`; a montage without a video is skipped with a warning.
 - Texts can be overridden in `scan/gen_config.json` (`descriptions`).
 

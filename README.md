@@ -4,8 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Viral-style **moto Shorts engine**. It scans raw footage, scores the strongest moments, cuts them **on the beat**
-of claim-free phonk music with a hook and a closing line, adds a short voice, and uploads at the pace
-YouTube allows.
+of modern, motivating claim-free music with a hook and a closing line, adds the owner's **cloned voice** (every
+take re-listened by Whisper: no repeated phrase, no cut word), refuses anything that could identify the owner or
+anyone else, and uploads at the pace YouTube allows with a detailed description.
 
 Companion to [social2shorts](https://github.com/m-elkhou/social2shorts), which provides the YouTube client and OAuth.
 
@@ -14,8 +15,9 @@ Companion to [social2shorts](https://github.com/m-elkhou/social2shorts), which p
 ## Pipeline
 
 ```text
-raw clips -> inventory -> moments -> classify (CLIP) -> gen_batch (plan)
-          -> render_batch (viral_cut.py) -> gen_vo_edge -> overlay_vo -> upload_short -> YouTube
+raw clips -> inventory -> moments -> classify (CLIP) -> privacy_scan (clean intervals) -> gen_batch (plan)
+          -> gen_vo_clone -> render_batch (viral_cut.py, voice + music in one pass)
+          -> privacy_check (audit, review, approve) -> upload_short -> YouTube
 ```
 
 | Stage | Script |
@@ -23,7 +25,10 @@ raw clips -> inventory -> moments -> classify (CLIP) -> gen_batch (plan)
 | Inventory, moments, tags | `scan/inventory.py`, `scan/moments.py`, `scan/classify.py` |
 | Plan N unique montages | `scan/gen_batch.py` |
 | Beat-synced render | `scan/render_batch.py`, `viral_cut.py` |
-| Voice and mix | `scan/gen_vo_edge.py`, `scan/overlay_vo.py` |
+| Voice, re-listening and mix | `scan/gen_vo_clone.py`, `mm_voicecheck.py`, `mm_audio.py` |
+| Privacy gate | `mm_privacy.py`, `mm_scene.py`, `scan/privacy_scan.py`, `scan/privacy_check.py`, `scan/raw_audit.py` |
+| Music ranking | `scan/music_catalog.py` |
+| Description rule | `mm_description.py`, `scan/make_meta.py` |
 | Upload | `upload_short.py` |
 | Narrated "calm" path | `src/` (Remotion), `make_one.py` |
 
@@ -44,7 +49,7 @@ Every stage is re-runnable (finished work is skipped) and can be run alone from 
 ([Configuration](https://m-elkhou.github.io/motoride-montage/configuration/)).
 
 ```console
-pip install -r requirements-dev.txt && python -m pytest tests -q   # 34 tests, no ffmpeg/network needed
+pip install -r requirements-dev.txt && python -m pytest tests -q   # 129 tests, no ffmpeg, network or model needed
 ```
 
 ## What is NOT in this repository

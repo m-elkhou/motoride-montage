@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Mixe la voix courte (vo/<id>.mp3) LEGER par-dessus le phonk, debut a 0.4 s.
+"""OBSOLETE : depuis le 10/11/2026 viral_cut.py mixe la voix dans la MEME passe que la musique (mm_audio.py :
+voix traitee, musique baissee sous la voix, 48 kHz, flux controle). Ce script re-encodait l'audio d'un montage deja
+fini (voix a peine au-dessus de la musique, flux AAC parfois corrompu). Conserve pour memoire, plus appele.
+
+Mixe la voix courte (vo/<id>.mp3) LEGER par-dessus le phonk, debut a 0.4 s.
 Remplace out/<id>.mp4 (video copiee, audio re-mux).
 
 IDEMPOTENT : apres le mixage on ecrit un marqueur out/<id>.voiced contenant la signature (taille:date) du
@@ -10,7 +14,7 @@ remixee. Options :
 """
 import sys
 from pathlib import Path as _P
-sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
+sys.path.insert(0, str(_P(__file__).resolve().parents[2]))
 import json
 import os
 import shutil

@@ -4,6 +4,9 @@ Usage (depuis le dossier de social2shorts : `uv run python <ce fichier> ...`) :
   upload_short.py meta/a.json meta/b.json | "meta/g_*.json"   [--not-before HH:MM] [--retry-min 10]
                   [--max-hours 6] [--dry-run] [--ledger meta/_uploaded.json]
 
+- PORTE ANONYMAT : un montage qui n'a pas ete approuve (scan/privacy_check.py audit puis approve), ou qui a change
+  depuis, est REFUSE ; aucun contournement ;
+- REGLE STRICTE DES DESCRIPTIONS : detaillee, signature (Instagram), hashtags a la fin, sinon le meta est refuse ;
 - TOUS les fichiers meta sont valides AVANT le premier envoi ; un meta invalide est signale et saute
   (il n'arrete plus tout le lot) ;
 - chaque envoi reussi est ecrit dans le journal (`--ledger`, defaut meta/_uploaded.json) IMMEDIATEMENT :
@@ -23,6 +26,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mm_description  # noqa: E402
 import mm_paths  # noqa: E402
 
 REQUIRED = ("video", "title", "description", "tags")
@@ -49,8 +53,9 @@ def expand_metas(args):
     return out
 
 
-def validate_meta(meta):
-    """Liste des erreurs d'un meta deja charge (liste vide = valide)."""
+def validate_meta(meta, signature=None):
+    """Liste des erreurs d'un meta deja charge (liste vide = valide). Avec `signature`, la description doit aussi
+    respecter la regle stricte (detaillee, signature, hashtags a la fin : voir mm_description.py)."""
     errs = [f"champ manquant: {k}" for k in REQUIRED if k not in meta]
     if errs:
         return errs
@@ -60,6 +65,8 @@ def validate_meta(meta):
         errs.append("tags doit etre une liste")
     if not Path(meta["video"]).is_file():
         errs.append(f"video introuvable: {meta['video']}")
+    if signature is not None:
+        errs += ["description: " + p for p in mm_description.description_problems(meta["description"], signature)]
     if meta.get("privacy", "public") not in PRIVACY:
         errs.append(f"privacy invalide: {meta.get('privacy')}")
     if meta.get("publishAt"):
@@ -68,6 +75,30 @@ def validate_meta(meta):
         except ValueError:
             errs.append(f"publishAt illisible: {meta['publishAt']}")
     return errs
+
+
+def video_signature(path):
+    st = os.stat(path)
+    return f"{st.st_size}:{st.st_mtime_ns}"
+
+
+def load_approvals(path):
+    """meta/_privacy_ok.json : {id_montage: {sig, by, date}} ecrit par scan/privacy_check.py approve."""
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def privacy_problem(meta, approvals):
+    """Porte ANONYMAT : None si le montage est approuve ET inchange depuis, sinon la raison du refus."""
+    v = Path(meta["video"])
+    entry = approvals.get(v.stem)
+    if not entry:
+        return "montage non approuve par la porte anonymat (scan/privacy_check.py audit, relecture, puis approve)"
+    if entry.get("sig") != video_signature(v):
+        return "montage modifie depuis son approbation : relancer audit puis approve"
+    return None
 
 
 def build_body(meta):
@@ -191,7 +222,12 @@ def main(argv=None):
     metas = expand_metas(a.meta)
     if not metas:
         sys.exit("aucun fichier meta trouve")
+    signature = mm_description.default_signature()
+    if not signature:
+        sys.exit("REGLE STRICTE : aucune signature (Instagram) configuree : definissez description_signature dans "
+                 "social2shorts/config.toml ([youtube]). Aucun envoi sans signature.")
     done = load_ledger(a.ledger, Path(a.ledger).parent)
+    approvals = load_approvals(Path(a.ledger).parent / "_privacy_ok.json")
     todo, invalid, skipped = [], [], []
     for mp in metas:  # validation de TOUT le lot avant le premier envoi
         try:
@@ -200,7 +236,7 @@ def main(argv=None):
             invalid.append(mp)
             print(f"INVALIDE {mp}: json illisible ({e})", flush=True)
             continue
-        errs = validate_meta(meta)
+        errs = validate_meta(meta, signature)
         if errs:
             invalid.append(mp)
             print(f"INVALIDE {mp}: " + " ; ".join(errs), flush=True)
@@ -208,7 +244,12 @@ def main(argv=None):
             skipped.append(mp)
             print(f"DEJA ENVOYE {mp} -> https://youtube.com/shorts/{done[norm(mp)]}", flush=True)
         else:
-            todo.append((mp, meta))
+            why = privacy_problem(meta, approvals)
+            if why:
+                invalid.append(mp)
+                print(f"REFUSE (anonymat) {mp}: {why}", flush=True)
+            else:
+                todo.append((mp, meta))
     print(f"{len(todo)} a envoyer, {len(skipped)} deja envoyes, {len(invalid)} invalides", flush=True)
 
     if a.dry_run:

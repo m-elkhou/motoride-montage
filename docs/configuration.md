@@ -60,8 +60,12 @@ Read by `gen_batch.py`, `build_montages.py` and `make_meta.py` through `mm_confi
 | Render timeout per montage | `MM_RENDER_TIMEOUT` (seconds) | 240 |
 | CUDA decoding | `SCAN_HW=1` (or `0` to force off) | on for classification if CUDA is available |
 | Scan workers | `SCAN_WORKERS` | 3 |
-| Voice | `VOICE`, `RATE` in `scan/gen_vo_edge.py` | `en-US-GuyNeural`, `+8%` |
-| Voice level and delay | `FC` in `scan/overlay_vo.py` | volume 1.35, delay 400 ms |
+| Voice | `SETTINGS`, `MIN_SPEECH`, `--words-per-s` in `scan/gen_vo_clone.py` | 6 candidates (up to 18), 2.5 words per second, slowed by 15 % at most |
+| Voice re-listening | `MM_ASR_PYTHON` (interpreter with faster-whisper), `MM_ASR_MODEL`; thresholds at the top of `mm_voicecheck.py` | social2shorts `.venv`, `large-v3` on CPU |
+| Voice, music and loudness levels, ducking, delay | constants at the top of `mm_audio.py` | voice -13.5 LUFS, music -15.5 LUFS, final -14 LUFS, delay 400 ms |
+| Privacy thresholds | constants at the top of `mm_privacy.py` | confident face >= 3 % of the frame width, 2 people >= 5 % of the height |
+| New montage ids, segments per montage | `id_prefix`, `segments_per_montage`, `min_clips`, `min_interval` in `scan/gen_config.json` | `safe`, 12, 5, 2.6 s |
+| Lanes (one lane = one montage, no clip shared) | `clips_per_montage` (distinct clips per lane, at least), `lane_seconds` (verified seconds reserved per lane), `min_seconds` (verified seconds a montage must keep after the blocklist), `min_score` | 5, 45 s, 28 s, 0.42 |
 | Target length | manifest `target` | 18 s |
 | Uploader pacing | `upload_short.py` flags | retry 10 min, 6 h (launcher: 45 min, 30 h) |
 
@@ -85,7 +89,9 @@ motoride-montage/
 ├── tests/                  pytest suite (no ffmpeg, no network, no YouTube)
 ├── local_paths.json        local
 ├── public/                 local  music (claim-free), staged clips
-├── out/                    local  rendered videos and their *.voiced markers
+├── out/                    local  rendered videos, *.plan.json, _cat/ (footage the privacy gate analyses)
+├── PRIVATE/                local  quarantine: anything that failed the gate is MOVED here, never deleted
+├── models/                 local  face-detection model (python mm_privacy.py --fetch-model)
 ├── vo/                     local  voice files
 ├── meta/                   local  upload metadata, the upload ledger and logs
 └── docs/, mkdocs.yml       this site

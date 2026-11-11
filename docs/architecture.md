@@ -26,7 +26,9 @@ flowchart TB
 
     subgraph Render["Rendering"]
         RB[render_batch.py] --> VC[viral_cut.py<br/>librosa + ffmpeg]
-        VO[gen_vo_edge.py] --> OV[overlay_vo.py]
+        VO[gen_vo_clone.py] --> RB
+        PS[privacy_scan.py] --> GEN
+        RB --> CK[privacy_check.py<br/>audit + approve]
     end
 
     subgraph Publish["Publishing"]
@@ -55,7 +57,9 @@ flowchart TB
 | Analysis | `scan/inventory.py`, `moments.py`, `classify.py`, `check_published.py` | turn footage into scored, tagged moments |
 | Planning | `scan/gen_batch.py` | choose unique clips, copy, music and a publication schedule |
 | Rendering | `viral_cut.py`, `scan/render_batch.py` | beat-synced cut, text, master |
-| Audio | `scan/gen_vo_edge.py`, `scan/overlay_vo.py` | short voice, mixed under the music |
+| Audio | `scan/gen_vo_clone.py`, `mm_voicecheck.py`, `mm_audio.py` | the owner's cloned voice, every take re-listened by Whisper, treated and mixed with the music in one pass |
+| Scene and copy rules | `mm_scene.py`, `mm_description.py` | no car shots; strict description (detailed, signature, hashtags last) |
+| Privacy gate | `mm_privacy.py`, `scan/privacy_scan.py`, `scan/privacy_check.py` | no visible face, no bystander; nothing is uploaded unapproved |
 | Publishing | `upload_short.py`, `scan/_upload_launch.ps1` | quota-aware scheduled upload |
 | Metadata | `scan/make_meta.py` | `meta/<id>.json` with signature and hashtags |
 | Orchestration | `run_pipeline.py` | named stages, `--from/--to/--only`, upload only on request |
@@ -71,7 +75,7 @@ The JSON files are the interfaces:
 | `scan/moments.jsonl` | `moments.py` | `classify.py`, `gen_batch.py` | `path`, `name`, `top4[{t,score}]`, `mean_bright`, `ok` |
 | `scan/clip_tags.json` | `classify.py` | `gen_batch.py` | per path: `top`, `moto` |
 | `scan/mont/<id>.json` | `gen_batch.py` | `viral_cut.py` | `[{clip,start,len,score}]` |
-| `scan/batch_manifest.json` | `gen_batch.py` | `render_batch.py`, `gen_vo_edge.py`, `overlay_vo.py` | `id,theme,music,hook,outro,title,tags,target,publishAt` |
+| `scan/batch_manifest.json` | `gen_batch.py` | `render_batch.py`, `gen_vo_clone.py` | `id,theme,music,hook,outro,title,tags,target,publishAt` |
 | `meta/<id>.json` | `make_meta.py` | `upload_short.py` | `video,title,description,tags,categoryId,lang,privacy,publishAt` |
 
 ## Boundary with social2shorts
@@ -83,8 +87,7 @@ one place.
 
 ## Operating model
 
-- **Every stage is re-runnable**: renders skip valid outputs, the voice skips existing files, the mix writes a
-  `.voiced` marker, `moments.py` and `classify.py` resume, `make_meta.py` never overwrites, the uploader keeps a ledger.
+- **Every stage is re-runnable**: renders skip valid outputs, the voice is regenerated only when the hook changes, a render is redone when its plan, voice, music or code is newer, `moments.py` and `classify.py` resume, `make_meta.py` never overwrites, the uploader keeps a ledger.
 - **Timeouts everywhere**: every ffmpeg call is bounded; a render that exceeds its timeout has **its own process tree**
   killed (never other jobs) and its partial file removed.
 - **Portable**: paths come from `mm_paths.py` (environment, `local_paths.json`, defaults); only the PowerShell

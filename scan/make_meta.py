@@ -2,8 +2,8 @@
 """Genere meta/<id>.json (entree de upload_short.py) depuis scan/batch_manifest.json.
 
 C'etait l'etape manquante du pipeline. Chaque meta contient : video, titre, description, tags, categorie,
-langue, privacy et publishAt. La description est toujours : accroche du theme, ligne de presentation,
-VOTRE SIGNATURE, puis les hashtags (tags + #Shorts).
+langue, privacy et publishAt. REGLE STRICTE (mm_description.py) : la description est TOUJOURS detaillee (accroche,
+presentation, appel a l'abonnement), puis VOTRE SIGNATURE (votre Instagram), puis les hashtags TOUT A LA FIN.
 
 Usage : python scan/make_meta.py [--out meta] [--signature "..."] [--privacy private] [--force]
 - un meta existant n'est PAS ecrase sans --force ; une video absente est sautee (avertissement) ;
@@ -17,46 +17,31 @@ from pathlib import Path as _P
 sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
 import argparse
 import json
-import tomllib
 from pathlib import Path
 
 import mm_config
+import mm_description
 import mm_paths
 
-DEFAULT_ABOUT = "🏍️ Moto Ride Vlog : des sorties moto filmées au guidon. Abonne-toi pour la suite."
+DEFAULT_ABOUT = ("🏍️ Des sorties moto filmées au guidon : des routes de montagne, des lignes droites, des virages et "
+                 "ces moments de liberté qu'on ne trouve que sur deux roues. De nouveaux Shorts chaque semaine.")
+DEFAULT_CTA = "🔔 Abonne-toi et active la cloche pour ne rien rater, et dis-moi en commentaire où tu roules ! 💬"
 DEFAULT_INTRO = {
-    "pov": "La route, le moteur, et plus rien d'autre. 🔥",
-    "rider": "L'esprit motard, filmé au plus près. 🔥",
-    "crew": "Rouler à plusieurs, c'est autre chose. 🔥",
+    "pov": "La route, le moteur, et plus rien d'autre : monte derrière le guidon le temps d'un Short. 🔥",
+    "rider": "L'esprit motard, filmé au plus près : la moto, la route et la passion qui va avec. 🔥",
+    "crew": "Rouler à plusieurs, c'est autre chose : la route se partage. 🔥",
 }
+# textes propres a la chaine (nom, ton) : dans scan/gen_config.json -> "descriptions" (fichier local, hors depot)
 
-
-def hashtags(tags):
-    """tags -> '#moto #motopov ... #Shorts' (espaces retires, #Shorts toujours en dernier)."""
-    out = ["#" + t.replace(" ", "") for t in tags if t.replace(" ", "")]
-    if "#Shorts" not in out:
-        out.append("#Shorts")
-    return " ".join(out)
-
-
-def build_description(manifest_entry, signature, about, intro):
-    parts = [intro.get(manifest_entry["theme"], ""), about, signature, hashtags(manifest_entry["tags"])]
-    return "\n\n".join(p for p in parts if p)
+hashtags = mm_description.hashtags
+build_description = mm_description.build_description
+default_signature = mm_description.default_signature
 
 
 def build_meta(m, video_path, description, privacy="private", lang="fr", category="2"):
     return {"video": Path(video_path).as_posix(), "title": m["title"], "privacy": privacy,
             "publishAt": m["publishAt"], "categoryId": category, "lang": lang, "tags": m["tags"],
             "description": description}
-
-
-def default_signature():
-    cfg = mm_paths.S2S_ROOT / "config.toml"
-    try:
-        data = tomllib.loads(cfg.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return ""
-    return data.get("youtube", {}).get("description_signature") or data.get("description_signature", "")
 
 
 def main(argv=None):
@@ -70,6 +55,7 @@ def main(argv=None):
     mm_paths.use_root()
     cfg = mm_config.load().get("descriptions", {})
     about = cfg.get("about", DEFAULT_ABOUT)
+    cta = cfg.get("cta", DEFAULT_CTA)
     intro = {**DEFAULT_INTRO, **cfg.get("intro", {})}
     sig = a.signature if a.signature is not None else default_signature()
     if not sig and not a.no_signature:
@@ -88,7 +74,11 @@ def main(argv=None):
         if dest.exists() and not a.force:
             kept.append(m["id"])
             continue
-        meta = build_meta(m, video, build_description(m, sig, about, intro), privacy=a.privacy)
+        desc = build_description(m, sig, about, intro, cta)
+        bad = [] if a.no_signature else mm_description.description_problems(desc, sig)
+        if bad:
+            sys.exit(f"description non conforme pour {m['id']} : {' ; '.join(bad)}")
+        meta = build_meta(m, video, desc, privacy=a.privacy)
         dest.write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
         made.append(m["id"])
     print(f"meta: {len(made)} ecrits, {len(kept)} deja presents (conserves), {len(absent)} sans video {absent}", flush=True)

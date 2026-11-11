@@ -62,10 +62,12 @@ def test_pipeline_stage_selection():
     import run_pipeline as rp
     assert rp.select(None, None, None)[0] == "inventory" and rp.select(None, None, None)[-1] == "meta"
     assert "upload" not in rp.select(None, None, None)           # l'envoi n'est jamais implicite
-    assert rp.select("plan", "mix", None) == ["plan", "render", "voice", "mix"]
+    assert rp.select("plan", "render", None) == ["plan", "voice", "render"]   # la voix est mixee DANS le rendu
     assert rp.select(None, None, "render") == ["render"]
+    assert rp.NAMES.index("privacy") < rp.NAMES.index("plan")                  # le pool verifie precede le plan
+    assert rp.NAMES.index("check") > rp.NAMES.index("render") and rp.NAMES.index("check") < rp.NAMES.index("meta")
     with pytest.raises(SystemExit):
-        rp.select("mix", "plan", None)
+        rp.select("render", "plan", None)
 
 
 def test_upload_stage_is_a_dry_run_unless_confirmed():

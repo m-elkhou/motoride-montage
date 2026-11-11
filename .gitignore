@@ -103,3 +103,12 @@ site/
 .claude/
 .playwright-cli/
 .playwright-mcp/
+
+# --- porte anonymat : jamais de modele, de quarantaine ni de donnee d'audit dans le depot
+models/
+*.onnx
+PRIVATE/
+scan/privacy_pool.json
+scan/privacy_blocklist.json
+scan/privacy_scan.log
+out/_cat/

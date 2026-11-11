@@ -38,3 +38,10 @@ any generated output.
 
 Open a GitHub issue **without** secrets or personal data. If a credential was committed by mistake, rotate
 it first, then rewrite history.
+
+## Anonymity
+
+The privacy gate ([details](pipeline/privacy.md)) keeps faces and bystanders out of the videos. Everything it
+produces stays local and git-ignored: `PRIVATE/` (quarantine), `models/`, `scan/privacy_pool.json`,
+`scan/privacy_blocklist.json`, `meta/_privacy*` and `out/_cat/`. The documentation never names the channel or its
+social accounts.

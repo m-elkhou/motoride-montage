@@ -4,8 +4,10 @@ Usage: python viral_cut.py --clips a.mp4 b.mp4 --music public/future.mp3 --hook 
 import argparse, json, shutil, subprocess, re, tempfile, os
 from pathlib import Path
 import numpy as np
+import mm_audio
 import mm_paths
 FF=mm_paths.FFMPEG; FONT=mm_paths.ffmpeg_font(); FPS=30
+STRICT=False   # mode --segments : une fenetre ne sort JAMAIS des intervalles verifies
 def run(cmd): return subprocess.run(cmd,capture_output=True,text=True,encoding="utf-8",errors="replace")
 
 def music_grid(path, target):
@@ -21,6 +23,10 @@ def music_grid(path, target):
         if e>best[0]: best=(e,beats[k])
     drop=best[1]; offset=max(0.0,drop-0.35*target)
     grid=[b-offset for b in beats if 0<=b-offset<=target+0.5]
+    # le detecteur s'arrete parfois avant la fin de l'extrait (video plus courte que l'audio) : on prolonge au tempo
+    if len(grid)>=2:
+        step=float(np.median(np.diff(grid)))
+        while step>0.2 and grid[-1]<target+0.5: grid.append(grid[-1]+step)
     return tempo,offset,drop-offset,grid
 
 def clip_energy(path):
@@ -47,20 +53,27 @@ def best_window(ts,sc,L,used,margin=0.5):
         s=ts[i]; e=s+L
         if e>ts[-1]: break
         if any(not(e+margin<=u0 or s-margin>=u1) for u0,u1 in used): continue
-        m=(ts>=s)&(ts<e); en=sc[m].mean() if m.any() else 0
+        m=(ts>=s)&(ts<e)
+        if STRICT and (not m.any() or (sc[m]<=0).any()): continue
+        en=sc[m].mean() if m.any() else 0
         if en>best[0]: best=(en,s)
     return best
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument("--clips",nargs="*",default=[]); ap.add_argument("--music",required=True)
     ap.add_argument("--hook",default=""); ap.add_argument("--outro",default=""); ap.add_argument("--target",type=float,default=18); ap.add_argument("--out",required=True)
+    ap.add_argument("--voice",default="",help="voix courte (mp3) mixee dans la meme passe que la musique")
+    ap.add_argument("--plan",default="",help="ecrit le plan reellement utilise (clip, debut source, instant dans le montage)")
+    ap.add_argument("--audit-proxy",default="",help="copie des images assemblees SANS texte ni etalonnage, pour la porte anonymat")
     ap.add_argument("--segments",default="",help="json: [{clip,start,len,score}] moments pre-selectionnes (ordre libre)")
     ap.add_argument("--grade",default="eq=contrast=1.08:saturation=1.25:brightness=0.01,vignette=PI/5")
     a=ap.parse_args()
     tempo,offset,drop,grid=music_grid(a.music,a.target)
     mult=2 if tempo>140 else 1
     print(f"musique: {tempo:.0f} BPM, offset {offset:.2f}s, drop a {drop:.2f}s, {len(grid)} beats dans {a.target}s")
+    global STRICT
     if a.segments:
+        STRICT=True
         M=json.load(open(a.segments,encoding="utf-8")); a.clips=list(dict.fromkeys(m["clip"] for m in M))
         # energie synthetique: 1 sur les fenetres de moments, 0 ailleurs (+ score)
         E={}
@@ -103,6 +116,14 @@ def main():
         if o.exists(): lst.append(o)
     (tmp/"list.txt").write_text("".join(f"file '{p.as_posix()}'\n" for p in lst),encoding="utf-8")
     cat=tmp/"cat.mp4"; run([FF,"-y","-f","concat","-safe","0","-i",str(tmp/"list.txt"),"-c","copy",str(cat)])
+    t_acc=0.0
+    for sg,o in zip(segs,lst):
+        sg["t_out"]=round(t_acc,3); sg["t_len"]=round(mm_audio.duration(o),3); t_acc+=sg["t_len"]
+    if a.plan: Path(a.plan).write_text(json.dumps(segs,ensure_ascii=False,indent=1),encoding="utf-8")
+    if a.audit_proxy and cat.exists(): shutil.copyfile(cat,a.audit_proxy)
+    vd=mm_audio.duration(cat)   # la video assemblee peut etre plus courte que la cible : duree finale = duree reelle
+    if 0.5<vd<a.target-0.05: print(f"video plus courte que la cible ({vd:.2f}s) : duree finale {vd:.2f}s")
+    a.target=round(min(a.target,vd),3) if vd>0.5 else a.target
     hook=a.hook.strip(); txt=""
     if hook:
         w=hook.split(); lines=[hook]
@@ -125,14 +146,19 @@ def main():
         t0=max(0.0,a.target-3.0); t1=a.target-0.25
         txt=txt+f",drawtext=fontfile='{FONT}':textfile='{otfp}':x=(w-text_w)/2:y=h*0.60:fontsize={ofs}:line_spacing=10:fontcolor=white:borderw=6:bordercolor=black:box=1:boxcolor=black@0.35:boxborderw=22:enable='between(t,{t0:.2f},{t1:.2f})'"
     vfc=f"[0:v]{a.grade}{txt},format=yuv420p[v]"
-    afc=(f"[1:a]atrim=start={offset:.3f},asetpts=PTS-STARTPTS,atrim=0:{a.target},afade=t=in:d=0.3,afade=t=out:st={a.target-0.8:.2f}:d=0.8,loudnorm=I=-14:TP=-1:LRA=9[a]")
     # Encodage final en DEUX etapes : (1) video seule, (2) audio + copie de la video.
     # Un seul graphe video+audio se figeait de facon deterministe avec ffmpeg 9.x (ex. a l'image 414, sortie coincee) ;
     # la video seule s'encode en ~10 s, l'assemblage en ~1 s. Meme rendu, plus de blocage.
     vonly=tmp/"video_only.mp4"
     r=run([FF,"-y","-i",str(cat),"-filter_complex",vfc,"-map","[v]","-t",str(a.target),"-c:v","libx264","-preset","fast","-crf","20",str(vonly)])
     if vonly.exists():
-        r=run([FF,"-y","-i",str(vonly),"-i",a.music,"-filter_complex",afc,"-map","0:v","-map","[a]","-t",str(a.target),"-c:v","copy","-c:a","aac","-b:a","192k","-movflags","+faststart",a.out])
+        try:
+            vd2=mm_audio.duration(vonly)
+            info=mm_audio.build_audio(a.music,offset,vd2,a.voice or None,tmp/"audio.m4a",tmp)
+            print("audio:",json.dumps(info))
+            r=run([FF,"-y","-i",str(vonly),"-i",str(tmp/"audio.m4a"),"-map","0:v","-map","1:a","-c","copy","-movflags","+faststart",a.out])
+        except (RuntimeError,subprocess.TimeoutExpired) as e:
+            r=subprocess.CompletedProcess([],1,"",f"audio: {e}")
     print("OK ->",a.out if Path(a.out).exists() else "ECHEC "+r.stderr[-400:])
     for d in {tmp, *(Path(x).parent for x in (tf if hook else None, otf if outro else None) if x)}:  # dossiers temporaires
         shutil.rmtree(d,ignore_errors=True)
