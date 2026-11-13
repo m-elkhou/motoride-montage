@@ -26,7 +26,15 @@ Ordered by value for the effort. IDs refer to the [architecture review](review.m
 - [x] Planner: lanes sized in verified seconds, identical copies of a rush planned once, black-bar sources excluded,
   static POV shots refused by the audit (R31)
 
-## Next
+## Next (owner, 2026-11-13)
+
+- [ ] Trending energetic music (Moroccan pop and rap, English pop) once the owner has chosen how it is licensed
+  ([Music](pipeline/music.md))
+- [ ] A narrated monologue of about 50 s in the owner's cloned voice, French first, over the whole montage
+  ([Next session](next-session.md))
+- [ ] Rebuild the render venv and download the models again ([Handoff](handoff.md))
+
+## Then
 
 - [ ] **More safe footage.** After the strict review only a handful of montages survive: most of the clean pool was
   consumed by other people, plates and cars. Two ways to widen it without relaxing a rule: score more windows of the

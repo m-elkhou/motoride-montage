@@ -40,3 +40,17 @@ passages against the median level: `viral_cut.py` places the slow-motion hero sh
 | Fit | hard drops give `viral_cut.py` a clear moment for the slow-mo hero shot |
 | Mood | upbeat, driving tracks: the channel is about the joy of riding |
 | Rights | library tracks are claim-free and easy to verify |
+
+## Next: trending tracks (owner, 2026-11-13)
+
+The owner wants current, energetic trends (Moroccan pop and rap, English pop) rather than library music only.
+Three routes, to be chosen by the owner before any render:
+
+| Route | Automatable | Catch |
+|---|---|---|
+| Commercial track in the upload | yes | Content ID claim: revenue to the rights holder, possible block by label or country |
+| In-app Shorts sounds (licensed for Shorts) | no, added by hand in the YouTube app | the trend itself, but manual |
+| Licensed library (subscription such as Epidemic Sound or Artlist, channel declared) | yes | "trend-like" tracks, not the hit itself |
+
+The ranking of `scan/music_catalog.py` (level, drop strength, mood) applies to whatever source is chosen. See
+[Next session](../next-session.md).
