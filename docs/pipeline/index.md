@@ -19,6 +19,8 @@ request).
 | 7 | [Upload](upload.md) · `upload_short.py` | `meta/*.json` + videos | YouTube + the ledger `meta/_uploaded.json`; **refuses anything not approved** |
 | - | [Music](music.md) | — | `public/*.mp3` (yours) |
 
-!!! info "Two render paths"
+!!! info "Three render paths"
     The **viral path** (this page) is `viral_cut.py` with ffmpeg. The **[calm path](remotion.md)** is a
-    Remotion composition with captions and a narrated voice. Only the viral path is wired end to end.
+    Remotion composition with captions and a narrated voice. The **[narrated path](narration.md)** is
+    `narrated_cut.py`, run by hand from a plan: it is not a stage of `run_pipeline.py`. Only the viral path is
+    wired end to end.

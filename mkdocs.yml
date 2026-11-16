@@ -70,6 +70,7 @@ nav:
       - pipeline/index.md
       - 1. Scan and select moments: pipeline/scan.md
       - 2. Beat-synced montage: pipeline/montage.md
+      - Narrated montage: pipeline/narration.md
       - 3. Music: pipeline/music.md
       - 4. Voice and on-screen text: pipeline/voice.md
       - Privacy gate: pipeline/privacy.md

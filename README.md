@@ -25,7 +25,8 @@ raw clips -> inventory -> moments -> classify (CLIP) -> privacy_scan (clean inte
 | Inventory, moments, tags | `scan/inventory.py`, `scan/moments.py`, `scan/classify.py` |
 | Plan N unique montages | `scan/gen_batch.py` |
 | Beat-synced render | `scan/render_batch.py`, `viral_cut.py` |
-| Voice, re-listening and mix | `scan/gen_vo_clone.py`, `mm_voicecheck.py`, `mm_audio.py` |
+| Narrated render, plates blurred | `narrated_cut.py`, `mm_plates.py` |
+| Voice, re-listening and mix | `scan/gen_vo_clone.py`, `mm_voicecheck.py`, `mm_lang.py`, `mm_audio.py` |
 | Privacy gate | `mm_privacy.py`, `mm_scene.py`, `scan/privacy_scan.py`, `scan/privacy_check.py`, `scan/raw_audit.py` |
 | Music ranking | `scan/music_catalog.py` |
 | Description rule | `mm_description.py`, `scan/make_meta.py` |
@@ -49,7 +50,7 @@ Every stage is re-runnable (finished work is skipped) and can be run alone from 
 ([Configuration](https://m-elkhou.github.io/motoride-montage/configuration/)).
 
 ```console
-pip install -r requirements-dev.txt && python -m pytest tests -q   # 129 tests, no ffmpeg, network or model needed
+pip install -r requirements-dev.txt && python -m pytest tests -q   # no ffmpeg, network or model needed
 ```
 
 ## What is NOT in this repository

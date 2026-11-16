@@ -19,8 +19,11 @@ setting: **environment variable → `local_paths.json` → default**.
 | ffmpeg | `MM_FFMPEG` | `ffmpeg` | `ffmpeg` found on `PATH` |
 | ffprobe | `MM_FFPROBE` | `ffprobe` | `ffprobe` found on `PATH` |
 | Python for scan/render/voice | `MM_RENDER_PYTHON` | `render_python` | the Python running the script |
+| Python of the plate detector | `MM_PLATES_PYTHON` | `plates_python` | the Python running the script |
 | social2shorts location | `MM_S2S_ROOT` | `s2s_root` | `../social2shorts` (sibling folder) |
 | Cloned-voice reference | `MM_VOICE_REF` | `voice_ref` | `<social2shorts>/work/voiceover/ref_en_clean.wav` |
+| Cloned-voice reference for one language | `MM_VOICE_REF_FR`, `MM_VOICE_REF_EN`, `MM_VOICE_REF_AR` | `voice_ref_fr`, `voice_ref_en`, `voice_ref_ar` | English: the cloned-voice reference above. Another language: that reference only when `MM_VOICE_REF` or `voice_ref` is set by you; with nothing set the voice stage stops (the default recording is in English) |
+| Voice language (`en`, `fr`, `ar`) | `MM_VOICE_LANG` | `voice_lang` | `en`; `--lang` of `scan/gen_vo_clone.py` overrides it for the voice stage, and the `lang` field of a manifest entry overrides it for the audit of that montage |
 | Action-cam folder | `MM_INSTA360_DIR` | `insta360_dir` | `~/Desktop/insta360` |
 | Text font | `MM_FONT` | `font` | Arial Bold on Windows, DejaVu Sans Bold on Linux |
 
@@ -28,7 +31,9 @@ setting: **environment variable → `local_paths.json` → default**.
 {
   "ffmpeg": "C:/tools/ffmpeg/bin/ffmpeg",
   "render_python": "C:/venvs/render/Scripts/python.exe",
-  "s2s_root": "D:/projects/social2shorts"
+  "s2s_root": "D:/projects/social2shorts",
+  "voice_lang": "fr",
+  "voice_ref_fr": "D:/voices/reference_fr.wav"
 }
 ```
 
@@ -60,8 +65,11 @@ Read by `gen_batch.py`, `build_montages.py` and `make_meta.py` through `mm_confi
 | Render timeout per montage | `MM_RENDER_TIMEOUT` (seconds) | 240 |
 | CUDA decoding | `SCAN_HW=1` (or `0` to force off) | on for classification if CUDA is available |
 | Scan workers | `SCAN_WORKERS` | 3 |
-| Voice | `SETTINGS`, `MIN_SPEECH`, `--words-per-s` in `scan/gen_vo_clone.py` | 6 candidates (up to 18), 2.5 words per second, slowed by 15 % at most |
-| Voice re-listening | `MM_ASR_PYTHON` (interpreter with faster-whisper), `MM_ASR_MODEL`; thresholds at the top of `mm_voicecheck.py` | social2shorts `.venv`, `large-v3` on CPU |
+| Voice | `SETTINGS`, `MIN_SPEECH`, `WORDS_PER_S`, `--words-per-s` in `scan/gen_vo_clone.py` | 6 candidates (up to 18); pace target 2.5 words per second in English and Arabic, 3.2 in French; an English take is slowed by 15 % at most, a take in another language is never slowed down |
+| Voice checkpoint | `MM_TTS_T3` (for example `v3`): the T3 checkpoint of Chatterbox, passed as `t3_model` only when the installed Chatterbox accepts it; otherwise the stage stops | the checkpoint of the installed version |
+| Voice re-listening | `MM_ASR_PYTHON` (interpreter with faster-whisper), `MM_ASR_MODEL`; thresholds at the top of `mm_voicecheck.py`; word rules per language in `mm_lang.py` | the Python running the script when it has faster-whisper, else the social2shorts `.venv`; `large-v3` |
+| Whisper processor | `MM_ASR_DEVICE`: `cpu`, `cuda` or `auto` | `auto`: the graphics card when `torch/lib` of the Whisper interpreter holds both `cublas64_12.dll` and a cuDNN 9 library (`cudnn*64_9.dll`), else the CPU (`cuda` without these files also runs on the CPU). If the server stops while working, it is restarted once on the CPU. The voice stage prints the processor it uses |
+| Audit language | the `lang` field (`en`, `fr`, `ar`) of a montage in `scan/batch_manifest.json` | the voice language above (`MM_VOICE_LANG`, `voice_lang`, else `en`) |
 | Voice, music and loudness levels, ducking, delay | constants at the top of `mm_audio.py` | voice -13.5 LUFS, music -15.5 LUFS, final -14 LUFS, delay 400 ms |
 | Privacy thresholds | constants at the top of `mm_privacy.py` | confident face >= 3 % of the frame width, 2 people >= 5 % of the height |
 | New montage ids, segments per montage | `id_prefix`, `segments_per_montage`, `min_clips`, `min_interval` in `scan/gen_config.json` | `safe`, 12, 5, 2.6 s |
@@ -78,6 +86,8 @@ motoride-montage/
 ├── mm_paths.py  mm_run.py  mm_config.py   shared paths, safe process runner, editorial config
 ├── run_pipeline.py         orchestrator (named stages, --from / --to / --only)
 ├── viral_cut.py            beat-synced cutter
+├── narrated_cut.py         narrated montage, run by hand from a plan
+├── mm_plates.py  mm_lang.py   licence-plate masking; language rules of the voice check
 ├── upload_short.py         YouTube uploader (ledger, validation)
 ├── make_one.py  gen_batch_vo.py  build_preview_sheet.py   calm path and contact sheet
 ├── src/                    Remotion composition

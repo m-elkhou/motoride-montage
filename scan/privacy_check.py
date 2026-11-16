@@ -9,7 +9,8 @@
   python scan/privacy_check.py status
 
 Regle : aucun visage visible (meme casque ouvert), aucune autre personne proche, piste audio saine, memes durees
-audio et video. Au moindre doute : refus. L'envoi YouTube (upload_short.py) REFUSE un montage non approuve, ou
+audio et video, voix reecoutee dans la langue du montage (champ « lang » du manifest, sinon MM_VOICE_LANG / `voice_lang`
+de local_paths.json, sinon anglais). Au moindre doute : refus. L'envoi YouTube (upload_short.py) REFUSE un montage non approuve, ou
 modifie apres son approbation. Les images refusees sont ajoutees a scan/privacy_blocklist.json (le planificateur
 ne les reutilise plus).
 """
@@ -26,6 +27,7 @@ import cv2
 import numpy as np
 
 import mm_audio
+import mm_lang
 import mm_paths
 import mm_privacy
 import mm_scene
@@ -98,17 +100,26 @@ def static_shots(plan, grays, step_s, min_motion=STATIC_MIN):
     return out
 
 
-def voice_in_mix(asr, video, expected, voice_wav=None):
-    """Reecoute la voix DANS le mixage final (sous la musique) : Whisper doit entendre exactement la phrase prevue,
-    sans repetition ni coupure. -> (problemes, texte entendu)."""
+def lang_of(mid):
+    """Langue de la voix d'un montage : le champ « lang » de sa ligne du manifest s'il y est, sinon la langue par
+    defaut (MM_VOICE_LANG, `voice_lang` de local_paths.json, en). ValueError si la langue n'est pas geree."""
+    lang = next((m.get("lang") for m in load_json("scan/batch_manifest.json", []) if m["id"] == mid), None)
+    return mm_lang.checked(str(lang).strip().lower()) if lang else mm_lang.default_lang()
+
+
+def voice_in_mix(asr, video, expected, voice_wav=None, lang="en"):
+    """Reecoute la voix DANS le mixage final (sous la musique), dans la langue `lang` : Whisper doit entendre
+    exactement la phrase prevue, sans repetition ni coupure. -> (problemes, texte entendu)."""
     vdur = mm_audio.duration(voice_wav) if voice_wav and _P(voice_wav).exists() else 3.0
-    heard = asr.text(video, clip_end=round(mm_audio.VOICE_DELAY + vdur + 0.8, 2))
-    return [f"voix dans le mixage : {p}" for p in mm_voicecheck.word_problems(expected, heard)], heard
+    clip_end = round(mm_audio.VOICE_DELAY + vdur + 0.8, 2)
+    # anglais : l'appel d'avant, sans langue (le serveur transcrit alors en anglais ; un ASR ancien n'a pas `lang`)
+    heard = asr.text(video, clip_end=clip_end) if lang == "en" else asr.text(video, clip_end=clip_end, lang=lang)
+    return [f"voix dans le mixage : {p}" for p in mm_voicecheck.word_problems(expected, heard, lang)], heard
 
 
 def voice_check(asr, mid):
-    """Reecoute de la voix d'un montage : le fichier seul (precis) et le debut du mixage final (sous la musique).
-    -> (problemes, texte entendu dans le mixage)."""
+    """Reecoute de la voix d'un montage, dans SA langue (`lang_of`) : le fichier seul (precis) et le debut du mixage
+    final (sous la musique). -> (problemes, texte entendu dans le mixage)."""
     txt, wavp, vid = _P(f"vo/{mid}.clone.txt"), _P(f"vo/{mid}.wav"), video_of(mid)
     if not txt.exists():
         return ["voix : texte attendu introuvable (vo/<id>.clone.txt)"], None
@@ -116,11 +127,15 @@ def voice_check(asr, mid):
         return ["voix non reecoutee (Whisper indisponible) : refus par prudence"], None
     if not vid.exists() or not wavp.exists():
         return ["voix ou montage absent"], None
+    try:
+        lang = lang_of(mid)
+    except ValueError as e:  # langue inconnue dans le manifest : ce montage est refuse, les autres sont audites
+        return [f"voix : {e}"], None
     expected = txt.read_text(encoding="utf-8").splitlines()[0].strip()
-    problems, heard = voice_in_mix(asr, vid, expected, str(wavp))
+    problems, heard = voice_in_mix(asr, vid, expected, str(wavp), lang)
     import soundfile as sf
     w, sr = sf.read(str(wavp), dtype="float32")
-    alone, _ = mm_voicecheck.check_take(w, sr, wavp, expected, asr)
+    alone, _ = mm_voicecheck.check_take(w, sr, wavp, expected, asr, lang=lang)
     return problems + [f"voix (fichier) : {p}" for p in alone], heard
 
 

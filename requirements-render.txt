@@ -1,0 +1,22 @@
+# Environnement de rendu (voix clonee, scan, audit) : Python 3.12, GPU NVIDIA (CUDA 12.4).
+#   uv venv <dossier> --python 3.12
+#   uv pip install --python <dossier>/Scripts/python.exe -r requirements-render.txt --torch-backend cu124
+# puis indiquer cet interpreteur dans local_paths.json (cle render_python).
+# Verifie le 2026-11-13 sous Windows 11, RTX 4060 (8 Go) : torch 2.6.0+cu124, transformers 5.2.0, numpy 1.26.4.
+
+chatterbox-tts==0.1.7          # fixe torch==2.6.0, torchaudio==2.6.0, transformers==5.2.0, numpy<2
+torchvision==0.21.0            # la version qui va avec torch 2.6.0
+open_clip_torch                # filtre « plan pris depuis une voiture » (mm_scene.py)
+opencv-python                  # YuNet (visages) ; resolu en 4.11 a cause de numpy<2
+soundfile
+librosa
+Pillow
+
+# Le filigrane de Chatterbox (resemble-perth) importe pkg_resources, retire de setuptools 81 :
+# sans cette borne, le modele ne se charge pas (« 'NoneType' object is not callable »).
+setuptools<81
+
+# Reecoute Whisper sur le GPU depuis le meme environnement (av 19 casse faster-whisper 1.2.1).
+faster-whisper==1.2.1
+av>=18.1,<19
+ctranslate2==4.8.3
