@@ -5,7 +5,7 @@
 | Need | Used by | Notes |
 |---|---|---|
 | Windows 10/11 (Linux/macOS mostly fine) | whole pipeline | the PowerShell launcher is Windows-only; everything else uses portable calls |
-| Python 3.12 | all scripts | one venv for scan/render/voice |
+| Python 3.12 | all scripts | one venv for scan/render/voice, built from `requirements-render.txt` (GPU build of torch) |
 | ffmpeg + ffprobe | everything | on `PATH`, or set `MM_FFMPEG` / `MM_FFPROBE` ([Configuration](configuration.md)) |
 | `librosa`, `numpy`, `Pillow` | `viral_cut.py`, `moments.py` | beat tracking and scoring |
 | `torch`, `open_clip_torch` | `classify.py` | CLIP ViT-B-32, CUDA optional but fast |

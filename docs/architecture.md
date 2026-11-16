@@ -57,7 +57,8 @@ flowchart TB
 | Analysis | `scan/inventory.py`, `moments.py`, `classify.py`, `check_published.py` | turn footage into scored, tagged moments |
 | Planning | `scan/gen_batch.py` | choose unique clips, copy, music and a publication schedule |
 | Rendering | `viral_cut.py`, `scan/render_batch.py` | beat-synced cut, text, master |
-| Audio | `scan/gen_vo_clone.py`, `mm_voicecheck.py`, `mm_audio.py` | the owner's cloned voice, every take re-listened by Whisper, treated and mixed with the music in one pass |
+| Narrated rendering | `narrated_cut.py`, `mm_plates.py`, `mm_scene.py` | shots on sentences and beats, plates blurred, word-by-word captions |
+| Audio | `scan/gen_vo_clone.py`, `mm_voicecheck.py`, `mm_lang.py`, `mm_audio.py` | the owner's cloned voice in the chosen language, every take re-listened by Whisper, treated and mixed with the music in one pass |
 | Scene and copy rules | `mm_scene.py`, `mm_description.py` | no car shots; strict description (detailed, signature, hashtags last) |
 | Privacy gate | `mm_privacy.py`, `scan/privacy_scan.py`, `scan/privacy_check.py` | no visible face, no bystander; nothing is uploaded unapproved |
 | Publishing | `upload_short.py`, `scan/_upload_launch.ps1` | quota-aware scheduled upload |
